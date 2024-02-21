@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "225969486095",
+    "firebase_url": "https://vayu-c00f8-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "vayu-c00f8",
+    "storage_bucket": "vayu-c00f8.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:225969486095:android:fc6a41aef2c2365cafa67a",
+        "android_client_info": {
+          "package_name": "com.example.vayu"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "225969486095-n6rumckpbhroo2dvcgifboj50rh184d1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.vayu",
+            "certificate_hash": "a1de623faac8e97f6a88ae5d34fea15c44bebf36"
+          }
+        },
+        {
+          "client_id": "225969486095-kgpd28sj92egpi26nh63pafq5htcmtbo.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPVrfUhM3tHaERG9ae57ob79ZqWtBaFgY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "225969486095-g51l24c9n8j24vihmvdc67279to903m9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "225969486095-6konlbh09ndtro546hpv6sg9v6paqf4r.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.animeBantai"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
