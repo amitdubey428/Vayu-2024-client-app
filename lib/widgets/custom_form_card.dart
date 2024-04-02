@@ -12,7 +12,7 @@ class CustomFormCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withOpacity(0.1),
             offset: const Offset(4, 6),
             blurRadius: 8.0,
             spreadRadius: 2.0,

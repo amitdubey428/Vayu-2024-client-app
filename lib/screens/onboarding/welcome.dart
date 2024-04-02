@@ -87,7 +87,7 @@ class WelcomePage extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.of(context)
-                              .pushNamed(Routes.signInSignUpPage);
+                              .pushReplacementNamed(Routes.signInSignUpPage);
                         },
                         style: ElevatedButton.styleFrom(
                           foregroundColor: Colors.black,
