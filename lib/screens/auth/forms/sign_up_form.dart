@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:vayu_flutter_app/models/user_model.dart';
@@ -90,6 +91,9 @@ class _SignUpFormState extends State<SignUpForm> {
       if (result == "success") {
         // Proceed to navigate or show success message
         authService.sendVerificationEmail();
+        if (kDebugMode) {
+          print("Email sent!");
+        }
         Navigator.of(context).pushReplacementNamed(
           Routes.otpVerification,
           arguments: '+91${_mobileController.text}',
