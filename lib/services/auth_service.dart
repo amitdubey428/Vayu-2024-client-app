@@ -1,40 +1,77 @@
-// lib/services/auth_service.dart
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vayu_flutter_app/models/user_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Sign in with email and password
-  Future<User?> signInWithEmailAndPassword(
-      String email, String password) async {
+  // Register user with email and password
+  Future<String?> registerWithEmailPassword(
+      String email, String password, UserModel userDetails) async {
     try {
-      final UserCredential userCredential =
-          await _auth.signInWithEmailAndPassword(
+      UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      return userCredential.user;
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found') {
-        if (kDebugMode) {
-          print('No user found for that email.');
-        }
-      } else if (e.code == 'wrong-password') {
-        if (kDebugMode) {
-          print('Wrong password provided for that user.');
-        }
+      User? user = userCredential.user;
+      if (user != null) {
+        // Save additional user details in Firestore
+        await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .set(userDetails.toMap());
+        return "success";
       }
+      return "User creation failed";
+    } on FirebaseAuthException catch (e) {
+      return e.message; // Returning the error message
+    } catch (e) {
+      return e.toString(); // General error
     }
-    return null;
   }
 
-  // Sign out
-  Future<void> signOut() async {
-    await _auth.signOut();
+  Future<void> sendVerificationEmail() async {
+    User? user = _auth.currentUser;
+    if (user != null && !user.emailVerified) {
+      await user.sendEmailVerification();
+    }
   }
 
-  // Stream to monitor authentication changes
-  Stream<User?> get user => _auth.authStateChanges();
+  // Future<void> verifyPhoneNumber(
+  //     String phoneNumber,
+  //     Function(String verificationId) onCodeSent,
+  //     Function(FirebaseAuthException e) onVerificationFailed) async {
+  //   await _auth.verifyPhoneNumber(
+  //     phoneNumber: phoneNumber,
+  //     verificationCompleted: (PhoneAuthCredential credential) async {
+  //       // Auto-retrieval or instant validation of OTP.
+  //       await _auth.signInWithCredential(credential);
+  //     },
+  //     verificationFailed: onVerificationFailed,
+  //     codeSent: (String verificationId, int? resendToken) async {
+  //       onCodeSent(verificationId);
+  //     },
+  //     codeAutoRetrievalTimeout: (String verificationId) {
+  //       // Auto-retrieval time out
+  //     },
+  //   );
+  // }
+
+  // Future<bool> verifyOTP(String verificationId, String smsCode) async {
+  //   try {
+  //     PhoneAuthCredential credential = PhoneAuthProvider.credential(
+  //         verificationId: verificationId, smsCode: smsCode);
+  //     await _auth.signInWithCredential(credential);
+  //     return true; // OTP verified successfully
+  //   } on FirebaseAuthException catch (e) {
+  //     if (kDebugMode) {
+  //       print(e.message);
+  //     }
+  //     return false; // OTP verification failed
+  //   }
+  // }
 }

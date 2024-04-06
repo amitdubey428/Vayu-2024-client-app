@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -28,10 +25,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for windows - '
@@ -48,6 +42,16 @@ class DefaultFirebaseOptions {
         );
     }
   }
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyAjp6v7654L-fc1NXt4Q0Ksntoml5Eohas',
+    appId: '1:225969486095:web:6db7601e227be5c2afa67a',
+    messagingSenderId: '225969486095',
+    projectId: 'vayu-c00f8',
+    authDomain: 'vayu-c00f8.firebaseapp.com',
+    databaseURL: 'https://vayu-c00f8-default-rtdb.asia-southeast1.firebasedatabase.app',
+    storageBucket: 'vayu-c00f8.appspot.com',
+  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDPVrfUhM3tHaERG9ae57ob79ZqWtBaFgY',
@@ -68,5 +72,17 @@ class DefaultFirebaseOptions {
     androidClientId: '225969486095-n6rumckpbhroo2dvcgifboj50rh184d1.apps.googleusercontent.com',
     iosClientId: '225969486095-fp528j09ckjeoptfta0bj8qm7d0hsr4b.apps.googleusercontent.com',
     iosBundleId: 'com.example.vayuFlutterApp',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyAGbI6bmYi__q6bHId1MkvjLecu1e0jwvM',
+    appId: '1:225969486095:ios:24560d9f4cb2b290afa67a',
+    messagingSenderId: '225969486095',
+    projectId: 'vayu-c00f8',
+    databaseURL: 'https://vayu-c00f8-default-rtdb.asia-southeast1.firebasedatabase.app',
+    storageBucket: 'vayu-c00f8.appspot.com',
+    androidClientId: '225969486095-n6rumckpbhroo2dvcgifboj50rh184d1.apps.googleusercontent.com',
+    iosClientId: '225969486095-rsae49dpv73p9ft50pdi78fb7ht95b2u.apps.googleusercontent.com',
+    iosBundleId: 'com.example.vayuFlutterApp.RunnerTests',
   );
 }

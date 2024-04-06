@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:vayu_flutter_app/models/user_model.dart';
+import 'package:vayu_flutter_app/routes/route_names.dart';
+import 'package:vayu_flutter_app/services/auth_service.dart';
 import 'package:vayu_flutter_app/widgets/custom_text_form_field.dart';
+import 'package:vayu_flutter_app/widgets/snackbar_util.dart';
 
 class SignUpForm extends StatefulWidget {
   const SignUpForm({super.key});
@@ -19,6 +23,8 @@ class _SignUpFormState extends State<SignUpForm> {
   final _confirmPasswordController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
 
+  bool _isLoading = false;
+
   DateTime? _birthDate;
 
   @override
@@ -31,6 +37,67 @@ class _SignUpFormState extends State<SignUpForm> {
     _confirmPasswordController.dispose();
     _dateController.dispose();
     super.dispose();
+  }
+
+  String? validateEmail(String? value) {
+    Pattern pattern =
+        r'^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$';
+    RegExp regex = RegExp(pattern as String);
+    if (!regex.hasMatch(value ?? '')) {
+      return 'Enter a valid email address';
+    } else {
+      return null;
+    }
+  }
+
+  String? validateMobile(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please enter your mobile number';
+    }
+    if (value.startsWith('+91')) {
+      return 'Please do not include country code';
+    }
+    if (value.length != 10) {
+      return 'Enter a 10 digit number';
+    }
+    return null;
+  }
+
+  Future<void> _registerUser() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+
+      UserModel newUser = UserModel(
+        uid: '',
+        firstName: _firstNameController.text,
+        lastName: _lastNameController.text,
+        email: _emailController.text,
+        mobileNumber: '+91${_mobileController.text}',
+        birthDate: _birthDate!,
+      );
+
+      AuthService authService = AuthService();
+      String? result = await authService.registerWithEmailPassword(
+        _emailController.text,
+        _passwordController.text,
+        newUser,
+      );
+
+      // Check if the widget is still mounted (i.e., not disposed) to safely interact with the context
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (result == "success") {
+        // Proceed to navigate or show success message
+        authService.sendVerificationEmail();
+        Navigator.of(context).pushReplacementNamed(
+          Routes.otpVerification,
+          arguments: '+91${_mobileController.text}',
+        );
+      } else {
+        SnackbarUtil.showSnackbar(context, result ?? "Registration failed");
+      }
+    }
   }
 
   @override
@@ -75,12 +142,7 @@ class _SignUpFormState extends State<SignUpForm> {
             labelText: 'Email',
             keyboardType: TextInputType.emailAddress,
             hintText: 'Enter your email address',
-            validator: (value) {
-              if (value == null || value.isEmpty || !value.contains('@')) {
-                return 'Please enter a valid email';
-              }
-              return null;
-            },
+            validator: validateEmail,
           ),
           Row(
             children: [
@@ -90,12 +152,7 @@ class _SignUpFormState extends State<SignUpForm> {
                   labelText: 'Mobile Number',
                   hintText: 'Enter your 10 digits mobile number',
                   keyboardType: TextInputType.phone,
-                  validator: (value) {
-                    if (value == null || value.isEmpty || value.length != 10) {
-                      return 'Enter a 10 digit number';
-                    }
-                    return null;
-                  },
+                  validator: validateMobile,
                 ),
               ),
             ],
@@ -156,12 +213,10 @@ class _SignUpFormState extends State<SignUpForm> {
           ),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: () {
-              if (_formKey.currentState!.validate()) {
-                // Sign up logic
-              }
-            },
-            child: const Text('Sign Up'),
+            onPressed: _isLoading ? null : _registerUser,
+            child: _isLoading
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text('Sign Up'),
           ),
         ],
       ),
