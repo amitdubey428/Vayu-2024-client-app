@@ -41,37 +41,66 @@ class AuthService {
     }
   }
 
-  // Future<void> verifyPhoneNumber(
-  //     String phoneNumber,
-  //     Function(String verificationId) onCodeSent,
-  //     Function(FirebaseAuthException e) onVerificationFailed) async {
-  //   await _auth.verifyPhoneNumber(
-  //     phoneNumber: phoneNumber,
-  //     verificationCompleted: (PhoneAuthCredential credential) async {
-  //       // Auto-retrieval or instant validation of OTP.
-  //       await _auth.signInWithCredential(credential);
-  //     },
-  //     verificationFailed: onVerificationFailed,
-  //     codeSent: (String verificationId, int? resendToken) async {
-  //       onCodeSent(verificationId);
-  //     },
-  //     codeAutoRetrievalTimeout: (String verificationId) {
-  //       // Auto-retrieval time out
-  //     },
-  //   );
-  // }
+  Future<void> verifyPhoneNumber(
+      String phoneNumber,
+      Function(String verificationId) onCodeSent,
+      Function(FirebaseAuthException e) onVerificationFailed) async {
+    await _auth.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        // Auto-retrieval or instant validation of OTP.
+        await _auth.signInWithCredential(credential);
+      },
+      verificationFailed: onVerificationFailed,
+      codeSent: (String verificationId, int? resendToken) async {
+        onCodeSent(verificationId);
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        // Auto-retrieval time out
+      },
+    );
+  }
 
-  // Future<bool> verifyOTP(String verificationId, String smsCode) async {
-  //   try {
-  //     PhoneAuthCredential credential = PhoneAuthProvider.credential(
-  //         verificationId: verificationId, smsCode: smsCode);
-  //     await _auth.signInWithCredential(credential);
-  //     return true; // OTP verified successfully
-  //   } on FirebaseAuthException catch (e) {
-  //     if (kDebugMode) {
-  //       print(e.message);
-  //     }
-  //     return false; // OTP verification failed
-  //   }
-  // }
+  Future<bool> verifyOTP(String verificationId, String smsCode) async {
+    if (_auth.currentUser != null) {
+      // Link phone number to existing user
+      final String? result = await linkPhoneNumber(verificationId, smsCode);
+      if (result == "Phone number linked successfully") {
+        return true;
+      } else {
+        if (kDebugMode) {
+          print(result);
+        }
+        return false;
+      }
+    } else {
+      // Normal OTP verification flow for new user
+      try {
+        PhoneAuthCredential credential = PhoneAuthProvider.credential(
+            verificationId: verificationId, smsCode: smsCode);
+        await _auth.signInWithCredential(credential);
+        return true; // OTP verified successfully
+      } on FirebaseAuthException catch (e) {
+        if (kDebugMode) {
+          print(e.message);
+        }
+        return false; // OTP verification failed
+      }
+    }
+  }
+
+  Future<String?> linkPhoneNumber(String verificationId, String smsCode) async {
+    try {
+      final AuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: smsCode,
+      );
+
+      final User? currentUser = _auth.currentUser;
+      await currentUser?.linkWithCredential(credential);
+      return "Phone number linked successfully";
+    } on FirebaseAuthException catch (e) {
+      return e.message;
+    }
+  }
 }

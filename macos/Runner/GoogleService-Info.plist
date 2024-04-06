@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>225969486095-rsae49dpv73p9ft50pdi78fb7ht95b2u.apps.googleusercontent.com</string>
+	<string>225969486095-fp528j09ckjeoptfta0bj8qm7d0hsr4b.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.225969486095-rsae49dpv73p9ft50pdi78fb7ht95b2u</string>
+	<string>com.googleusercontent.apps.225969486095-fp528j09ckjeoptfta0bj8qm7d0hsr4b</string>
 	<key>ANDROID_CLIENT_ID</key>
 	<string>225969486095-n6rumckpbhroo2dvcgifboj50rh184d1.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
@@ -15,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.vayuFlutterApp.RunnerTests</string>
+	<string>com.example.vayuFlutterApp</string>
 	<key>PROJECT_ID</key>
 	<string>vayu-c00f8</string>
 	<key>STORAGE_BUCKET</key>
@@ -31,7 +31,7 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:225969486095:ios:24560d9f4cb2b290afa67a</string>
+	<string>1:225969486095:ios:6099a03245fdac1aafa67a</string>
 	<key>DATABASE_URL</key>
 	<string>https://vayu-c00f8-default-rtdb.asia-southeast1.firebasedatabase.app</string>
 </dict>
