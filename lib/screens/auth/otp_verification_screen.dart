@@ -1,15 +1,13 @@
 // File: screens/auth/otp_verification_screen.dart
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:vayu_flutter_app/services/auth_service.dart';
+import 'package:provider/provider.dart';
+import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/themes/app_theme.dart';
 import 'package:vayu_flutter_app/widgets/custom_form_card.dart';
 import 'package:vayu_flutter_app/widgets/custom_otp_form_field.dart';
-import 'package:vayu_flutter_app/widgets/custom_text_form_field.dart';
 import 'package:vayu_flutter_app/widgets/snackbar_util.dart';
-import 'package:otp_text_field/otp_text_field.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
   final String phoneNumber;
@@ -30,10 +28,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   }
 
   _startPhoneNumberVerification() async {
-    AuthService().verifyPhoneNumber(
+    final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
+
+    authNotifier.verifyPhoneNumber(
       widget.phoneNumber,
       (verificationId) {
-        // This is safe, as setting state won't happen if the widget is unmounted
         if (mounted) {
           setState(() {
             _verificationId = verificationId;
@@ -41,7 +40,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
         }
       },
       (FirebaseAuthException e) {
-        // Use context safely after an async gap
         if (mounted) {
           SnackbarUtil.showSnackbar(
               context, e.message ?? "Phone number verification failed");
@@ -52,28 +50,26 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
 
   Future<void> _verifyOTP() async {
     if (_verificationId == null) {
-      // Use context safely after an async gap
       if (mounted) {
         SnackbarUtil.showSnackbar(context, "Verification ID not received");
       }
       return;
     }
+
+    final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
     bool success =
-        await AuthService().verifyOTP(_verificationId!, _otpController.text);
+        await authNotifier.verifyOTP(_verificationId!, _otpController.text);
+
     if (success) {
-      // Navigate or update UI safely after an async gap
       if (mounted) {
-        Navigator.pushReplacementNamed(
-            context, '/home'); // Assuming '/home' is your HomePage route
+        authNotifier
+            .resetOtpVerificationFlag(); // Reset the OTP verification flag
+        Navigator.of(context).pushReplacementNamed('/homePage');
       }
     } else {
-      // Use context safely after an async gap
       if (mounted) {
         SnackbarUtil.showSnackbar(context, "OTP Verification failed");
       }
-    }
-    if (kDebugMode) {
-      print("Clicked");
     }
   }
 

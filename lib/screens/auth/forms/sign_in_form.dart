@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/widgets/custom_text_form_field.dart';
+import 'package:vayu_flutter_app/widgets/snackbar_util.dart';
+import 'package:provider/provider.dart';
 
 enum SignInMethod { emailPassword, mobileOTP }
 
@@ -20,6 +23,41 @@ class _SignInFormState extends State<SignInForm> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _mobileController = TextEditingController();
   final TextEditingController _otpController = TextEditingController();
+
+  // Enhanced method for signing in
+  Future<void> _signIn() async {
+    String? signInResult;
+    final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
+
+    if (_signInMethod == SignInMethod.emailPassword) {
+      // Email and Password Sign-In
+      signInResult = await authNotifier.signInWithEmailPassword(
+        _emailController.text,
+        _passwordController.text,
+      );
+    } else {
+      // Assume `_verificationId` holds the verification ID from OTP sent method
+      // This will require storing the verification ID from the OTP sending process
+      String? verificationId; // This needs to be obtained correctly
+      signInResult = await authNotifier.signInOrLinkWithOTP(
+        verificationId!, // Make sure this is correctly obtained and not null
+        _otpController.text,
+      );
+    }
+
+    if (signInResult == "success") {
+      if (mounted) {
+        // Navigate to home screen or dashboard
+        Navigator.of(context)
+            .pushReplacementNamed('/homePage'); // Adjust as needed
+      }
+    } else {
+      // Show error message
+      if (mounted) {
+        SnackbarUtil.showSnackbar(context, signInResult ?? "Sign-in failed");
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -119,7 +157,7 @@ class _SignInFormState extends State<SignInForm> {
           ElevatedButton(
             onPressed: () {
               if (_formKey.currentState!.validate()) {
-                // Form submission logic
+                _signIn(); // Updated to use the enhanced _signIn method
               }
             },
             child: const Text('Sign In'),

@@ -8,12 +8,12 @@ class CustomOTPFormField extends StatelessWidget {
   final Function(String) onCompleted;
 
   const CustomOTPFormField({
-    Key? key,
+    super.key,
     required this.controller,
     required this.labelText,
     this.otpLength = 6,
     required this.onCompleted,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

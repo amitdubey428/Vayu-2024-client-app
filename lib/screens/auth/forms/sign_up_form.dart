@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:vayu_flutter_app/models/user_model.dart';
-import 'package:vayu_flutter_app/routes/route_names.dart';
-import 'package:vayu_flutter_app/services/auth_service.dart';
+import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/widgets/custom_text_form_field.dart';
 import 'package:vayu_flutter_app/widgets/snackbar_util.dart';
 
@@ -77,8 +77,9 @@ class _SignUpFormState extends State<SignUpForm> {
         birthDate: _birthDate!,
       );
 
-      AuthService authService = AuthService();
-      String? result = await authService.registerWithEmailPassword(
+      // Access AuthNotifier from the widget tree
+      var authNotifier = Provider.of<AuthNotifier>(context, listen: false);
+      String? result = await authNotifier.registerWithEmailPassword(
         _emailController.text,
         _passwordController.text,
         newUser,
@@ -88,14 +89,10 @@ class _SignUpFormState extends State<SignUpForm> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (result == "success") {
-        // Proceed to navigate or show success message
-        authService.sendVerificationEmail();
-        if (kDebugMode) {
-          print("Email sent!");
-        }
+      if (result == "redirect_to_otp") {
+        // Proceed to navigate to OTP verification screen
         Navigator.of(context).pushReplacementNamed(
-          Routes.otpVerification,
+          '/otpVerification',
           arguments: '+91${_mobileController.text}',
         );
       } else {

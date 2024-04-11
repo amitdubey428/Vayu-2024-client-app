@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:vayu_flutter_app/routes/route_names.dart';
 import 'package:vayu_flutter_app/themes/app_theme.dart';
 
 class WelcomePage extends StatelessWidget {
@@ -87,7 +86,7 @@ class WelcomePage extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.of(context)
-                              .pushReplacementNamed(Routes.signInSignUpPage);
+                              .pushReplacementNamed('/signInSignUpPage');
                         },
                         style: ElevatedButton.styleFrom(
                           foregroundColor: Colors.black,
