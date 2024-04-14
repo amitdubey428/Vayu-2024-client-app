@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/themes/app_theme.dart';
+import 'package:vayu_flutter_app/utils/globals.dart';
 import 'package:vayu_flutter_app/widgets/custom_form_card.dart';
 import 'package:flutter_signin_button/flutter_signin_button.dart';
 import 'package:vayu_flutter_app/screens/auth/forms/sign_in_form.dart';
 import 'package:vayu_flutter_app/screens/auth/forms/sign_up_form.dart';
+import 'package:vayu_flutter_app/widgets/snackbar_util.dart';
 
 class SignInSignUpPage extends StatefulWidget {
   const SignInSignUpPage({super.key});
@@ -40,9 +44,11 @@ class _SignInSignUpPageState extends State<SignInSignUpPage>
     } else {
       _animationController.reverse();
     }
-    setState(() {
-      isFront = !isFront;
-    });
+    if (mounted) {
+      setState(() {
+        isFront = !isFront;
+      });
+    }
   }
 
   @override
@@ -110,10 +116,28 @@ class _SignInSignUpPageState extends State<SignInSignUpPage>
                               padding: const EdgeInsets.only(top: 20.0),
                               child: SignInButton(
                                 Buttons.GoogleDark,
-                                onPressed: () {
-                                  // Google sign-in logic
+                                onPressed: () async {
+                                  final authNotifier =
+                                      Provider.of<AuthNotifier>(context,
+                                          listen: false);
+                                  String? result =
+                                      await authNotifier.signInWithGoogle();
+                                  if (result == "success") {
+                                    // Navigate to home page or other appropriate screen
+                                    if (navigatorKey.currentState != null) {
+                                      navigatorKey.currentState!
+                                          .pushReplacementNamed('/homePage');
+                                    }
+                                  } else {
+                                    // Show error message
+                                    SnackbarUtil.showSnackbar(
+                                        result ?? "Google sign-in failed");
+                                  }
                                 },
                               ),
+                            ),
+                            const SizedBox(
+                              height: 10,
                             ),
                             ElevatedButton(
                               onPressed: flipCard,

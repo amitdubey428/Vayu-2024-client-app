@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-class CustomOTPFormField extends StatelessWidget {
+class CustomOTPFormField extends StatefulWidget {
   final TextEditingController controller;
   final String labelText;
   final int otpLength;
@@ -16,33 +16,42 @@ class CustomOTPFormField extends StatelessWidget {
   });
 
   @override
+  State<CustomOTPFormField> createState() => _CustomOTPFormFieldState();
+}
+
+class _CustomOTPFormFieldState extends State<CustomOTPFormField> {
+  final bool _showError = false;
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(labelText,
+        Text(widget.labelText,
             style: Theme.of(context).textTheme.titleLarge,
             textAlign: TextAlign.center),
         const SizedBox(height: 8),
         TextField(
-          controller: controller,
+          autofocus: true,
+          controller: widget.controller,
           keyboardType: TextInputType.number,
-          maxLength: otpLength,
+          maxLength: widget.otpLength,
           textAlign: TextAlign.center,
           style: const TextStyle(letterSpacing: 8.0, fontSize: 24),
           decoration: InputDecoration(
             counterText: "",
+            errorText: _showError ? 'Invalid OTP' : null,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            hintText: "-" * otpLength,
+            hintText: "-" * widget.otpLength,
           ),
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(otpLength),
+            LengthLimitingTextInputFormatter(widget.otpLength),
           ],
           onChanged: (value) {
-            if (value.length == otpLength) {
-              onCompleted(value);
+            if (value.length == widget.otpLength) {
+              widget.onCompleted(value);
             }
           },
         ),

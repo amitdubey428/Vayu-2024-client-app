@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
+import 'package:vayu_flutter_app/widgets/custom_count_down_timer.dart';
 import 'package:vayu_flutter_app/widgets/custom_text_form_field.dart';
 import 'package:vayu_flutter_app/widgets/snackbar_util.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +18,11 @@ class _SignInFormState extends State<SignInForm> {
   final _formKey = GlobalKey<FormState>();
   SignInMethod _signInMethod = SignInMethod.emailPassword;
   bool _otpSent = false;
+  String? _verificationID;
+  int _resendCount = 0; // Class member to keep track of resend attempts
+
+  // Define the GlobalKey with the public parent State type instead of the private State class.
+  final GlobalKey<CountdownState> _countdownKey = GlobalKey<CountdownState>();
 
   // Controllers
   final TextEditingController _emailController = TextEditingController();
@@ -26,46 +32,99 @@ class _SignInFormState extends State<SignInForm> {
 
   // Enhanced method for signing in
   Future<void> _signIn() async {
-    String? signInResult;
-    final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
+    try {
+      String? signInResult;
+      final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
 
-    if (_signInMethod == SignInMethod.emailPassword) {
-      // Email and Password Sign-In
-      signInResult = await authNotifier.signInWithEmailPassword(
-        _emailController.text,
-        _passwordController.text,
-      );
-    } else {
-      // Assume `_verificationId` holds the verification ID from OTP sent method
-      // This will require storing the verification ID from the OTP sending process
-      String? verificationId; // This needs to be obtained correctly
-      signInResult = await authNotifier.signInOrLinkWithOTP(
-        verificationId!, // Make sure this is correctly obtained and not null
-        _otpController.text,
-      );
-    }
-
-    if (signInResult == "success") {
-      if (mounted) {
-        // Navigate to home screen or dashboard
-        Navigator.of(context)
-            .pushReplacementNamed('/homePage'); // Adjust as needed
+      if (_signInMethod == SignInMethod.emailPassword) {
+        // Email and Password Sign-In
+        signInResult = await authNotifier.signInWithEmailPassword(
+          _emailController.text,
+          _passwordController.text,
+        );
+      } else {
+        signInResult = await authNotifier.signInOrLinkWithOTP(
+          _verificationID!, // Use the stored verification ID
+          _otpController.text,
+        );
       }
-    } else {
-      // Show error message
+
+      if (signInResult == "success") {
+        if (mounted) {
+          // Navigate to home screen or dashboard
+          Navigator.of(context).pushReplacementNamed('/homePage');
+        }
+      } else {
+        // Show error message
+        if (mounted) {
+          SnackbarUtil.showSnackbar(signInResult ?? "Sign-in failed");
+        }
+      }
+    } catch (e) {
       if (mounted) {
-        SnackbarUtil.showSnackbar(context, signInResult ?? "Sign-in failed");
+        SnackbarUtil.showSnackbar("An error occurred: ${e.toString()}");
       }
     }
   }
 
+  /// Handles changes in the mobile input field.
+  void _onMobileChanged() {
+    // bool isValid = isMobileNumberValid(_mobileController.text);
+    if (!_otpSent) {
+      setState(() {});
+    }
+  }
+
+  /// Initializes state and adds a listener to the mobile controller.
+  @override
+  void initState() {
+    super.initState();
+    _mobileController.addListener(_onMobileChanged);
+  }
+
+  /// Disposes controllers and removes the listener.
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _mobileController.removeListener(_onMobileChanged); // Remove the listener
     _mobileController.dispose();
     _otpController.dispose();
     super.dispose();
+  }
+
+  /// Checks if the mobile number is valid.
+  bool isMobileNumberValid(String number) {
+    String trimmedNumber =
+        number.trim(); // Remove any leading or trailing whitespace
+    return trimmedNumber.isNotEmpty &&
+        trimmedNumber.length == 10 &&
+        int.tryParse(trimmedNumber) != null;
+  }
+
+  void _resendOtp(Function setState) {
+    if (_resendCount >= 3) {
+      SnackbarUtil.showSnackbar("Maximum resend attempts reached.");
+      return;
+    }
+    setState(() {
+      _otpSent = false;
+      _resendCount++;
+    });
+    // Resend OTP logic
+    final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
+    authNotifier.verifyPhoneNumber(
+      '+91${_mobileController.text}',
+      (verificationId) {
+        setState(() {
+          _verificationID = verificationId;
+          _otpSent = true;
+        });
+      },
+      (e) => SnackbarUtil.showSnackbar(e.message ?? "Verification failed"),
+    );
+    _countdownKey.currentState
+        ?.resetTimer(const Duration(seconds: 90)); // Extend time on reset
   }
 
   Widget _buildEmailPasswordFields() {
@@ -76,10 +135,10 @@ class _SignInFormState extends State<SignInForm> {
           labelText: 'Email',
           hintText: 'Enter your email',
           validator: (value) {
-            if (value == null || value.isEmpty) {
+            if (value?.isEmpty ?? true) {
               return 'Please enter your email';
             }
-            if (!value.contains('@') || !value.contains('.')) {
+            if (!value!.contains('@') || !value.contains('.')) {
               return 'Please enter a valid email';
             }
             return null;
@@ -91,7 +150,7 @@ class _SignInFormState extends State<SignInForm> {
           hintText: 'Enter your password',
           obscureText: true,
           validator: (value) {
-            if (value == null || value.isEmpty) {
+            if (value?.isEmpty ?? true) {
               return 'Please enter your password';
             }
             return null;
@@ -116,31 +175,92 @@ class _SignInFormState extends State<SignInForm> {
             return null;
           },
         ),
-        if (_otpSent)
-          CustomTextFormField(
-            controller: _otpController,
-            labelText: 'OTP',
-            hintText: 'Enter the OTP',
-            keyboardType: TextInputType.number,
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter the OTP';
-              }
-              return null;
-            },
-          ),
         const SizedBox(height: 10),
-        if (!_otpSent)
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _otpSent = true;
-              });
-              // Here, integrate OTP sending logic
-            },
-            child: const Text('Send OTP'),
-          ),
+        _otpActionWidget(),
+        if (_otpSent) _buildOTPInputField(),
       ],
+    );
+  }
+
+  Widget _otpActionWidget() {
+    return StatefulBuilder(
+      builder: (context, setState) {
+        if (!_otpSent) {
+          return ElevatedButton(
+            onPressed:
+                isMobileNumberValid(_mobileController.text) ? _sendOTP : null,
+            child: const Text('Send OTP'),
+          );
+        } else {
+          return Countdown(
+            key: _countdownKey,
+            duration: const Duration(seconds: 10),
+            onFinish: () {
+              if (_resendCount < 3) {
+                setState(() {
+                  // Only show the Resend button if under the limit
+                  _otpSent = false;
+                });
+              } else {
+                setState(() {
+                  // Otherwise, disable OTP functionality
+                  SnackbarUtil.showSnackbar("Maximum resend attempts reached.");
+                });
+              }
+            },
+            builder: (context, remaining) {
+              if (remaining > Duration.zero) {
+                return Text('Resend OTP in ${remaining.inSeconds} seconds');
+              } else {
+                return ElevatedButton(
+                  onPressed:
+                      _resendCount < 3 ? () => _resendOtp(setState) : null,
+                  child: const Text('Resend OTP'),
+                );
+              }
+            },
+          );
+        }
+      },
+    );
+  }
+
+  void _sendOTP() {
+    setState(() {
+      _otpSent =
+          true; // Ensure this gets updated only after successful OTP send
+      _resendCount++; // Increment on successful OTP send
+    });
+    final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
+    authNotifier.verifyPhoneNumber(
+      '+91${_mobileController.text}',
+      (verificationId) {
+        setState(() {
+          _verificationID = verificationId;
+        });
+      },
+      (e) {
+        // Handle verification failed
+        SnackbarUtil.showSnackbar(e.message ?? "Verification failed");
+        setState(() {
+          _otpSent = false; // Reset OTP sent status if verification fails
+        });
+      },
+    );
+  }
+
+  Widget _buildOTPInputField() {
+    return CustomTextFormField(
+      controller: _otpController,
+      labelText: 'OTP',
+      hintText: 'Enter the OTP',
+      keyboardType: TextInputType.number,
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter the OTP';
+        }
+        return null;
+      },
     );
   }
 

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -41,22 +40,21 @@ class _SignUpFormState extends State<SignUpForm> {
   }
 
   String? validateEmail(String? value) {
-    Pattern pattern =
-        r'^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$';
-    RegExp regex = RegExp(pattern as String);
-    if (!regex.hasMatch(value ?? '')) {
-      return 'Enter a valid email address';
-    } else {
-      return null;
+    if (value == null || value.isEmpty) {
+      return 'Please enter your email address';
     }
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+      return 'Enter a valid email address';
+    }
+    return null;
   }
 
   String? validateMobile(String? value) {
     if (value == null || value.isEmpty) {
       return 'Please enter your mobile number';
     }
-    if (value.startsWith('+91')) {
-      return 'Please do not include country code';
+    if (value.startsWith('+')) {
+      return 'Please enter mobile number without country code';
     }
     if (value.length != 10) {
       return 'Enter a 10 digit number';
@@ -89,14 +87,10 @@ class _SignUpFormState extends State<SignUpForm> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (result == "redirect_to_otp") {
-        // Proceed to navigate to OTP verification screen
-        Navigator.of(context).pushReplacementNamed(
-          '/otpVerification',
-          arguments: '+91${_mobileController.text}',
-        );
+      if (result != "success") {
+        SnackbarUtil.showSnackbar(result ?? "Registration failed");
       } else {
-        SnackbarUtil.showSnackbar(context, result ?? "Registration failed");
+        SnackbarUtil.showSnackbar(result ?? "Registration failed");
       }
     }
   }

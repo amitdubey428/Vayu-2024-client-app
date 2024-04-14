@@ -8,6 +8,16 @@ class AppTheme {
   static const Color lightPurple = Color(0xFFE5BEED);
   static const Color backgroundColor = Color.fromARGB(255, 170, 217, 227);
 
+  static final ThemeData highContrastTheme = ThemeData(
+    primaryColor: Colors.black,
+    scaffoldBackgroundColor: Colors.white,
+    colorScheme: const ColorScheme.highContrastLight(
+      primary: Colors.black,
+      secondary: Colors.yellow,
+    ),
+    // Other high contrast theme settings
+  );
+
   static final ThemeData lightTheme = ThemeData(
     primaryColor: primaryColor,
     scaffoldBackgroundColor: backgroundColor,

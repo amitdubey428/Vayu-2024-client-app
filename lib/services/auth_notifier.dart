@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 import 'package:vayu_flutter_app/models/user_model.dart';
 import 'package:vayu_flutter_app/utils/globals.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthNotifier extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -32,13 +32,18 @@ class AuthNotifier extends ChangeNotifier {
             .collection('users')
             .doc(user.uid)
             .set(userDetails.toMap());
+
         await user.sendEmailVerification();
+        navigatorKey.currentState?.pushReplacementNamed(
+          '/otpVerification',
+          arguments: userDetails.mobileNumber,
+        );
+        return "success";
         // Indicate that the user needs OTP verification
-        return "redirect_to_otp";
       }
       return "User creation failed";
     } on FirebaseAuthException catch (e) {
-      return e.message;
+      return handleAuthException(e);
     } catch (e) {
       return e.toString();
     }
@@ -58,12 +63,13 @@ class AuthNotifier extends ChangeNotifier {
       notifyListeners();
       return "success";
     } on FirebaseAuthException catch (e) {
-      return e.message;
+      return handleAuthException(e);
     }
   }
 
-  Future<void> logout(BuildContext context) async {
+  Future<void> logout() async {
     await _auth.signOut();
+    _phoneNumberForOtp = null; // Clear the phone number
     notifyListeners();
     navigatorKey.currentState?.pushReplacementNamed('/signInSignUpPage');
   }
@@ -101,7 +107,7 @@ class AuthNotifier extends ChangeNotifier {
         return "success";
       }
     } on FirebaseAuthException catch (e) {
-      return e.message;
+      return handleAuthException(e);
     }
   }
 
@@ -144,7 +150,42 @@ class AuthNotifier extends ChangeNotifier {
       notifyListeners();
       return "Phone number linked successfully";
     } on FirebaseAuthException catch (e) {
-      return e.message;
+      return handleAuthException(e);
+    }
+  }
+
+  Future<String?> signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser != null) {
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+        final AuthCredential credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        await _auth.signInWithCredential(credential);
+        notifyListeners();
+        return "success";
+      }
+      return "Google sign-in canceled";
+    } on FirebaseAuthException catch (e) {
+      return handleAuthException(e);
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  String handleAuthException(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'credential-already-in-use':
+        return "This credential is already associated with a different user account.";
+      case 'email-already-in-use':
+        return "The email address is already in use.";
+      case 'weak-password':
+        return "The password provided is too weak.";
+      default:
+        return e.message ?? "An unexpected error occurred.";
     }
   }
 }

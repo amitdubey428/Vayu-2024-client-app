@@ -42,7 +42,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       (FirebaseAuthException e) {
         if (mounted) {
           SnackbarUtil.showSnackbar(
-              context, e.message ?? "Phone number verification failed");
+              e.message ?? "Phone number verification failed");
         }
       },
     );
@@ -50,9 +50,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
 
   Future<void> _verifyOTP() async {
     if (_verificationId == null) {
-      if (mounted) {
-        SnackbarUtil.showSnackbar(context, "Verification ID not received");
-      }
+      SnackbarUtil.showSnackbar("Please request OTP before verifying.");
       return;
     }
 
@@ -68,7 +66,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       }
     } else {
       if (mounted) {
-        SnackbarUtil.showSnackbar(context, "OTP Verification failed");
+        SnackbarUtil.showSnackbar("OTP Verification failed. Please try again.");
       }
     }
   }

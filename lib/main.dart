@@ -11,13 +11,18 @@ import 'package:vayu_flutter_app/utils/globals.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding
-      .ensureInitialized(); // Ensures Flutter bindings are initialized
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions
-        .currentPlatform, // Uses the Firebase configuration based on the platform
-  );
-  runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    runApp(const MyApp());
+  } catch (e) {
+    if (kDebugMode) {
+      print('Firebase initialization error: $e');
+    }
+    runApp(ErrorApp(e.toString()));
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -34,21 +39,30 @@ class MyApp extends StatelessWidget {
         home: Consumer<AuthNotifier>(
           builder: (context, authNotifier, _) {
             if (authNotifier.currentUser != null) {
-              if (kDebugMode) {
-                print("Got called in main home page");
-              }
-              return const TemporaryHomePage(); // Directly go to home if logged in
+              return const TemporaryHomePage();
             } else {
-              if (kDebugMode) {
-                print("Got called in main sign in");
-              }
-
-              // Proceed t
-              return const SignInSignUpPage(); // Show sign in/up if not logged in
+              return const SignInSignUpPage();
             }
           },
         ),
         onGenerateRoute: RouteGenerator.generateRoute,
+      ),
+    );
+  }
+}
+
+class ErrorApp extends StatelessWidget {
+  final String errorMessage;
+
+  const ErrorApp(this.errorMessage, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Text('Failed to initialize Firebase: $errorMessage'),
+        ),
       ),
     );
   }

@@ -1,11 +1,13 @@
-// File: widgets/snackbar_util.dart
-
 import 'package:flutter/material.dart';
+import 'package:vayu_flutter_app/utils/globals.dart'; // Import to access navigatorKey
 
 class SnackbarUtil {
-  static void showSnackbar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+  static void showSnackbar(String message) {
+    final context = navigatorKey.currentContext;
+    if (context != null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 }

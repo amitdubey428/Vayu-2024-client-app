@@ -39,7 +39,7 @@ class TemporaryHomePage extends StatelessWidget {
               ElevatedButton(
                 onPressed: () async {
                   // Use Provider to access AuthNotifier and call logout
-                  await context.read<AuthNotifier>().logout(context);
+                  await context.read<AuthNotifier>().logout();
                 },
                 child: const Text('Logout'),
               ),
