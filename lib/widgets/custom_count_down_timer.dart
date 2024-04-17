@@ -26,13 +26,13 @@ class CountdownState extends State<Countdown> {
   @override
   void initState() {
     super.initState();
-    resetTimer(widget.duration);
+    startTimer();
   }
 
-  void resetTimer(Duration duration) {
+  void startTimer() {
     setState(() {
       _timer?.cancel();
-      _remaining = duration;
+      _remaining = widget.duration;
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (_remaining.inSeconds <= 0) {
           _timer?.cancel();
@@ -44,8 +44,12 @@ class CountdownState extends State<Countdown> {
         }
       });
     });
+  }
+
+  void resetTimer() {
+    startTimer();
     if (widget.onReset != null) {
-      widget.onReset!(duration);
+      widget.onReset!(widget.duration);
     }
   }
 
