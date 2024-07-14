@@ -88,9 +88,11 @@ class _SignUpFormState extends State<SignUpForm> {
       setState(() => _isLoading = false);
 
       if (result != "success") {
-        SnackbarUtil.showSnackbar(result ?? "Registration failed");
+        SnackbarUtil.showSnackbar(result ?? "Registration failed",
+            type: SnackbarType.error);
       } else {
-        SnackbarUtil.showSnackbar(result ?? "Registration failed");
+        SnackbarUtil.showSnackbar(result ?? "Registration failed",
+            type: SnackbarType.success);
       }
     }
   }

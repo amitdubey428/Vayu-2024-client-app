@@ -6,7 +6,7 @@ class AppTheme {
   static const Color secondaryColor = Color(0xFFFFA630);
   static const Color darkPurple = Color.fromARGB(255, 72, 44, 79);
   static const Color lightPurple = Color(0xFFE5BEED);
-  static const Color backgroundColor = Color.fromARGB(255, 170, 217, 227);
+  static const Color backgroundColor = Color.fromARGB(255, 239, 244, 246);
 
   static final ThemeData highContrastTheme = ThemeData(
     primaryColor: Colors.black,

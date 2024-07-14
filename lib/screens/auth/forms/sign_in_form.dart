@@ -53,12 +53,10 @@ class _SignInFormState extends State<SignInForm> {
     super.dispose();
   }
 
-  /// Updates the ability to send OTP based on the length of the mobile number.
   void _onMobileTextChanged() {
     _canSendOtp.value = _mobileController.text.length == 10 && !_isOtpSent;
   }
 
-  /// Updates the validity of the OTP based on its length
   void _onOtpTextChanged() {
     _isOtpValid.value = _otpController.text.length == 6;
   }
@@ -69,13 +67,25 @@ class _SignInFormState extends State<SignInForm> {
       var authNotifier = Provider.of<AuthNotifier>(context, listen: false);
       String? result = await authNotifier.signInWithEmailPassword(
           _emailController.text, _passwordController.text);
-      SnackbarUtil.showSnackbar(result ?? "Sign in failed");
+
+      SnackbarType snackbarType =
+          result == "success" ? SnackbarType.success : SnackbarType.error;
+      SnackbarUtil.showSnackbar(result ?? "Sign in failed", type: snackbarType);
     }
   }
 
-  /// Sends an OTP to the provided mobile number.
   void _sendOtp() async {
     if (_canSendOtp.value && _otpResendCount < 3) {
+      var authNotifier = Provider.of<AuthNotifier>(context, listen: false);
+      bool userExists =
+          await authNotifier.doesUserExist('+91${_mobileController.text}');
+
+      if (!userExists) {
+        SnackbarUtil.showSnackbar("User not found! Please register :)",
+            type: SnackbarType.error);
+        return;
+      }
+
       setState(() {
         _isOtpSent = true;
         _canSendOtp.value = false;
@@ -87,7 +97,6 @@ class _SignInFormState extends State<SignInForm> {
 
       _countdownKey.currentState?.resetTimer();
 
-      var authNotifier = Provider.of<AuthNotifier>(context, listen: false);
       authNotifier.verifyPhoneNumber(
         '+91${_mobileController.text}',
         (verificationId) {
@@ -96,20 +105,21 @@ class _SignInFormState extends State<SignInForm> {
           });
         },
         (e) {
-          SnackbarUtil.showSnackbar("Failed to send OTP: ${e.message}");
+          SnackbarUtil.showSnackbar("Failed to send OTP: ${e.message}",
+              type: SnackbarType.error);
           setState(() {
-            _isOtpSent = false; // Reset if sending fails
+            _isOtpSent = false;
             _canSendOtp.value = _mobileController.text.length == 10;
           });
         },
       );
       _otpResendCount++;
     } else {
-      SnackbarUtil.showSnackbar("Maximum OTP send attempts reached.");
+      SnackbarUtil.showSnackbar("Maximum OTP send attempts reached.",
+          type: SnackbarType.informative);
     }
   }
 
-  /// Verifies the OTP entered by the user.
   void _verifyOtp() async {
     var authNotifier = Provider.of<AuthNotifier>(context, listen: false);
     String? result = await authNotifier.signInOrLinkWithOTP(
@@ -126,11 +136,11 @@ class _SignInFormState extends State<SignInForm> {
         }
       }
     } else {
-      SnackbarUtil.showSnackbar(result ?? "OTP verification failed");
+      SnackbarUtil.showSnackbar(result ?? "OTP verification failed",
+          type: SnackbarType.error);
     }
   }
 
-  /// Builds the sign-in interface for email and password.
   Widget _buildSignInWithEmail() {
     return Column(
       children: [
@@ -173,7 +183,6 @@ class _SignInFormState extends State<SignInForm> {
     );
   }
 
-  /// Builds the sign-in interface for mobile OTP.
   Widget _buildSignInWithOtp() {
     return Column(
       children: [
@@ -223,9 +232,9 @@ class _SignInFormState extends State<SignInForm> {
             key: _countdownKey,
             duration: _currentOtpResendTime,
             onFinish: () {
-              SnackbarUtil.showSnackbar('You can now resend the OTP.');
+              SnackbarUtil.showSnackbar('You can now resend the OTP.',
+                  type: SnackbarType.informative);
               setState(() {
-                _verificationId = '';
                 _canSendOtp.value = _mobileController.text.length == 10;
               });
             },

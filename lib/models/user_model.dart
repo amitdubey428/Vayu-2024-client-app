@@ -3,25 +3,40 @@ class UserModel {
   final String firstName;
   final String lastName;
   final String email;
-  final String mobileNumber;
+  final String? mobileNumber;
   final DateTime birthDate;
+  final String gender;
+  final String country;
+  final String state;
+  final String occupation;
+  final List<String> interests;
 
   UserModel({
     required this.uid,
     required this.firstName,
     required this.lastName,
     required this.email,
-    required this.mobileNumber,
+    this.mobileNumber,
     required this.birthDate,
+    this.gender = '',
+    this.country = '',
+    this.state = '',
+    this.occupation = '',
+    this.interests = const [],
   });
 
   Map<String, dynamic> toMap() {
     return {
-      'firstName': firstName,
-      'lastName': lastName,
+      'firebase_uid': uid,
+      'full_name': '$firstName $lastName',
       'email': email,
-      'mobileNumber': mobileNumber,
-      'birthDate': birthDate.toIso8601String(),
+      'phone_number': mobileNumber,
+      'date_of_birth': birthDate.toIso8601String().split('T')[0],
+      'gender': gender,
+      'country': country,
+      'state': state,
+      'occupation': occupation,
+      'interests': interests,
     };
   }
 }

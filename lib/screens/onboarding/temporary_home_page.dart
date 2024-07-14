@@ -12,15 +12,7 @@ class TemporaryHomePage extends StatelessWidget {
     return Scaffold(
       body: DecoratedBox(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppTheme.primaryColor,
-              AppTheme.backgroundColor,
-              AppTheme.darkPurple,
-            ],
-          ),
+          color: AppTheme.backgroundColor,
         ),
         child: Center(
           child: Column(
@@ -32,7 +24,7 @@ class TemporaryHomePage extends StatelessWidget {
                   textStyle: const TextStyle(
                     fontSize: 48,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: Colors.black,
                   ),
                 ),
               ),

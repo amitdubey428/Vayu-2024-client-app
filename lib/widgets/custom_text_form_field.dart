@@ -33,27 +33,43 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      controller: widget.controller,
-      decoration: InputDecoration(
-        labelText: widget.labelText,
-        hintText: widget.hintText,
-        border: const UnderlineInputBorder(),
-        suffixIcon: widget.obscureText
-            ? IconButton(
-                icon:
-                    Icon(_isObscured ? Icons.visibility : Icons.visibility_off),
-                onPressed: () {
-                  setState(() {
-                    _isObscured = !_isObscured;
-                  });
-                },
-              )
-            : null,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: TextFormField(
+        controller: widget.controller,
+        decoration: InputDecoration(
+          hintText: widget.labelText, // Set label text as hint text
+          hintStyle: const TextStyle(color: Color.fromARGB(255, 124, 123, 123)),
+          filled: true,
+          fillColor: Colors.grey[200],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: const BorderSide(color: Colors.grey),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: const BorderSide(color: Colors.grey),
+          ),
+          suffixIcon: widget.obscureText
+              ? IconButton(
+                  icon: Icon(
+                      _isObscured ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () {
+                    setState(() {
+                      _isObscured = !_isObscured;
+                    });
+                  },
+                )
+              : null,
+        ),
+        keyboardType: widget.keyboardType,
+        validator: widget.validator,
+        obscureText: _isObscured,
       ),
-      keyboardType: widget.keyboardType,
-      validator: widget.validator,
-      obscureText: _isObscured,
     );
   }
 }

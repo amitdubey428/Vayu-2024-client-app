@@ -1,5 +1,6 @@
 // lib/routes/route_generator.dart
 import 'package:flutter/material.dart';
+import 'package:vayu_flutter_app/screens/auth/email_verification_screen.dart';
 import 'package:vayu_flutter_app/screens/auth/otp_verification_screen.dart';
 import 'package:vayu_flutter_app/screens/auth/sign_in_sign_up_page.dart';
 import 'package:vayu_flutter_app/screens/onboarding/temporary_home_page.dart';
@@ -21,6 +22,9 @@ class RouteGenerator {
         );
       case Routes.homePage:
         return MaterialPageRoute(builder: (_) => const TemporaryHomePage());
+      case Routes.emailVerification:
+        return MaterialPageRoute(
+            builder: (_) => const EmailVerificationScreen());
       default:
         return MaterialPageRoute(
             builder: (_) => const SignInSignUpPage()); // Default route

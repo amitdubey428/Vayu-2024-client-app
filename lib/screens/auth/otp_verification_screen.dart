@@ -1,4 +1,3 @@
-// File: screens/auth/otp_verification_screen.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -20,6 +19,9 @@ class OTPVerificationScreen extends StatefulWidget {
 class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   final _otpController = TextEditingController();
   String? _verificationId;
+  bool _isVerifying = false;
+  bool _isEmailVerified = false;
+  bool _isOtpVerified = false;
 
   @override
   void initState() {
@@ -42,7 +44,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       (FirebaseAuthException e) {
         if (mounted) {
           SnackbarUtil.showSnackbar(
-              e.message ?? "Phone number verification failed");
+              e.message ?? "Phone number verification failed",
+              type: SnackbarType.error);
         }
       },
     );
@@ -50,24 +53,98 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
 
   Future<void> _verifyOTP() async {
     if (_verificationId == null) {
-      SnackbarUtil.showSnackbar("Please request OTP before verifying.");
+      SnackbarUtil.showSnackbar("Please request OTP before verifying.",
+          type: SnackbarType.informative);
       return;
     }
+
+    setState(() {
+      _isVerifying = true;
+    });
 
     final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
     bool success =
         await authNotifier.verifyOTP(_verificationId!, _otpController.text);
 
+    setState(() {
+      _isVerifying = false;
+    });
+
     if (success) {
-      if (mounted) {
-        authNotifier
-            .resetOtpVerificationFlag(); // Reset the OTP verification flag
-        Navigator.of(context).pushReplacementNamed('/homePage');
-      }
+      setState(() {
+        _isOtpVerified = true;
+      });
+      SnackbarUtil.showSnackbar("Mobile number verified successfully.",
+          type: SnackbarType.success);
+      _checkEmailVerification();
     } else {
       if (mounted) {
-        SnackbarUtil.showSnackbar("OTP Verification failed. Please try again.");
+        SnackbarUtil.showSnackbar("OTP Verification failed. Please try again.",
+            type: SnackbarType.error);
       }
+    }
+  }
+
+  Future<void> _checkEmailVerification() async {
+    final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
+    User? user = authNotifier.currentUser;
+
+    if (user != null) {
+      await user.reload();
+      if (user.emailVerified) {
+        setState(() {
+          _isEmailVerified = true;
+        });
+        if (mounted) {
+          authNotifier.resetOtpVerificationFlag();
+          Navigator.of(context).pushReplacementNamed('/homePage');
+        }
+      } else {
+        setState(() {
+          _isEmailVerified = false;
+        });
+        SnackbarUtil.showSnackbar("Please verify your email before logging in.",
+            type: SnackbarType.warning);
+      }
+    }
+  }
+
+  Future<void> _showEmailVerificationDialog() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Verify Your Email'),
+        content: const Text(
+            'Please verify your email before logging in. Check your inbox for the verification email.'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await _checkEmailVerification();
+            },
+            child: const Text('Check Verification Status'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _resendEmailVerification() async {
+    final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
+    User? user = authNotifier.currentUser;
+    _showEmailVerificationDialog();
+
+    if (user != null) {
+      await user.sendEmailVerification();
+      SnackbarUtil.showSnackbar(
+          "Verification email sent. Please check your inbox.",
+          type: SnackbarType.informative);
     }
   }
 
@@ -85,15 +162,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
         resizeToAvoidBottomInset: true,
         body: DecoratedBox(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppTheme.primaryColor,
-                AppTheme.backgroundColor,
-                AppTheme.darkPurple,
-              ],
-            ),
+            color: AppTheme.backgroundColor,
           ),
           child: Stack(
             children: [
@@ -118,33 +187,45 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                                 textStyle: const TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: Colors.black,
                                 ),
                               ),
                             ),
                           ),
                           const Spacer(),
-                          CustomFormCard(
-                            key: const ValueKey("OTPVerification"),
-                            formElements: [
-                              CustomOTPFormField(
-                                controller: _otpController,
-                                labelText:
-                                    "Enter OTP sent to ${widget.phoneNumber}",
-                                onCompleted: (String value) {
-                                  // You can automatically trigger OTP verification here if you want
-                                  _verifyOTP();
-                                },
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(10.0),
-                                child: ElevatedButton(
-                                  onPressed: _verifyOTP,
-                                  child: const Text('Verify'),
+                          if (!_isOtpVerified)
+                            CustomFormCard(
+                              key: const ValueKey("OTPVerification"),
+                              formElements: [
+                                CustomOTPFormField(
+                                  controller: _otpController,
+                                  labelText:
+                                      "Enter OTP sent to ${widget.phoneNumber}",
+                                  onCompleted: (String value) {
+                                    _verifyOTP();
+                                  },
                                 ),
+                                Padding(
+                                  padding: const EdgeInsets.all(10.0),
+                                  child: ElevatedButton(
+                                    onPressed: _isVerifying ? null : _verifyOTP,
+                                    child: _isVerifying
+                                        ? const CircularProgressIndicator(
+                                            color: Colors.white,
+                                          )
+                                        : const Text('Verify'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          if (_isOtpVerified && !_isEmailVerified)
+                            Padding(
+                              padding: const EdgeInsets.all(10.0),
+                              child: ElevatedButton(
+                                onPressed: _resendEmailVerification,
+                                child: const Text('Resend Email Verification'),
                               ),
-                            ],
-                          ),
+                            ),
                           const Spacer(),
                           const Spacer(),
                         ],
