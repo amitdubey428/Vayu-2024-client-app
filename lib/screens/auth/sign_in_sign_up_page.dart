@@ -153,7 +153,7 @@ class _SignInSignUpPageState extends State<SignInSignUpPage>
                               onPressed: flipCard,
                               child: Text(isFront
                                   ? "Switch to Sign Up"
-                                  : "Back to Sign In"),
+                                  : "Back to Log In"),
                             ),
                             const Spacer(),
                           ],

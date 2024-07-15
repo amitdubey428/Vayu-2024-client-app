@@ -87,11 +87,17 @@ class _SignUpFormState extends State<SignUpForm> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (result != "success") {
+      if (result == "Email already in use.") {
+        SnackbarUtil.showSnackbar("This email is already registered.",
+            type: SnackbarType.error);
+      } else if (result == "Phone number already in use.") {
+        SnackbarUtil.showSnackbar("This phone number is already registered.",
+            type: SnackbarType.error);
+      } else if (result != "success") {
         SnackbarUtil.showSnackbar(result ?? "Registration failed",
             type: SnackbarType.error);
       } else {
-        SnackbarUtil.showSnackbar(result ?? "Registration failed",
+        SnackbarUtil.showSnackbar("Registration successful",
             type: SnackbarType.success);
       }
     }

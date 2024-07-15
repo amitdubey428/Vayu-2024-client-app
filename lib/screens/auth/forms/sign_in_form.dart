@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
@@ -61,7 +60,6 @@ class _SignInFormState extends State<SignInForm> {
     _isOtpValid.value = _otpController.text.length == 6;
   }
 
-  /// Initiates sign-in with email and password.
   void _signInWithEmail() async {
     if (_formKey.currentState!.validate()) {
       var authNotifier = Provider.of<AuthNotifier>(context, listen: false);
@@ -70,15 +68,15 @@ class _SignInFormState extends State<SignInForm> {
 
       SnackbarType snackbarType =
           result == "success" ? SnackbarType.success : SnackbarType.error;
-      SnackbarUtil.showSnackbar(result ?? "Sign in failed", type: snackbarType);
+      SnackbarUtil.showSnackbar(result ?? "Log in failed", type: snackbarType);
     }
   }
 
   void _sendOtp() async {
     if (_canSendOtp.value && _otpResendCount < 3) {
       var authNotifier = Provider.of<AuthNotifier>(context, listen: false);
-      bool userExists =
-          await authNotifier.doesUserExist('+91${_mobileController.text}');
+      bool userExists = await authNotifier
+          .doesUserExistByPhone('+91${_mobileController.text}');
 
       if (!userExists) {
         SnackbarUtil.showSnackbar("User not found! Please register :)",
@@ -124,21 +122,8 @@ class _SignInFormState extends State<SignInForm> {
     var authNotifier = Provider.of<AuthNotifier>(context, listen: false);
     String? result = await authNotifier.signInOrLinkWithOTP(
         _verificationId, _otpController.text);
-    if (result == "success") {
-      // Debug: Check if currentUser is set and navigate
-      if (kDebugMode) {
-        print(
-            "Debug: Current user logged in as: ${authNotifier.currentUser?.uid}");
-      }
-      if (authNotifier.currentUser != null) {
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/homePage');
-        }
-      }
-    } else {
-      SnackbarUtil.showSnackbar(result ?? "OTP verification failed",
-          type: SnackbarType.error);
-    }
+    SnackbarUtil.showSnackbar(result ?? "OTP verification failed",
+        type: result == "success" ? SnackbarType.success : SnackbarType.error);
   }
 
   Widget _buildSignInWithEmail() {
@@ -173,11 +158,11 @@ class _SignInFormState extends State<SignInForm> {
         ),
         ElevatedButton(
           onPressed: _signInWithEmail,
-          child: const Text('Sign In'),
+          child: const Text('Log In'),
         ),
         TextButton(
           onPressed: () => setState(() => _isOtpMode = true),
-          child: const Text('Sign In with OTP'),
+          child: const Text('Log In with OTP'),
         ),
       ],
     );

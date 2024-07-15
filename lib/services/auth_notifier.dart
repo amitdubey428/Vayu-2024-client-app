@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:vayu_flutter_app/models/user_model.dart';
+import 'package:vayu_flutter_app/routes/route_names.dart';
 import 'package:vayu_flutter_app/utils/globals.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:developer' as developer;
@@ -42,10 +43,10 @@ class AuthNotifier extends ChangeNotifier {
   }
 
   /// Checks if a user exists by phone number.
-  Future<bool> doesUserExist(String phoneNumber) async {
+  Future<bool> doesUserExistByPhone(String phoneNumber) async {
     final encodedPhoneNumber = Uri.encodeQueryComponent(phoneNumber);
     final url =
-        '${dotenv.env['API_BASE_URL']}/users/exists?phone=$encodedPhoneNumber';
+        '${dotenv.env['API_BASE_URL']}/users/exists_by_phone?phone=$encodedPhoneNumber';
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
@@ -73,7 +74,7 @@ class AuthNotifier extends ChangeNotifier {
 
         if (result != "success") {
           await user.delete();
-          return "User creation failed on backend";
+          return result;
         }
         setPhoneNumberForOtp(userDetails.mobileNumber!);
         await user.sendEmailVerification();
@@ -101,10 +102,6 @@ class AuthNotifier extends ChangeNotifier {
       return "No internet connection";
     }
 
-    if (kDebugMode) {
-      print('Sending user details: ${jsonEncode(userDetails.toMap())}');
-    }
-
     final url = '${dotenv.env['API_BASE_URL']}/users/create_user';
     final headers = {
       'Content-Type': 'application/json',
@@ -119,15 +116,13 @@ class AuthNotifier extends ChangeNotifier {
             headers: headers,
             body: body,
           )
-          .timeout(const Duration(seconds: 10)); // Set a 10-second timeout
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         return "success";
       } else {
-        if (kDebugMode) {
-          print('Backend error: ${response.statusCode} - ${response.body}');
-        }
-        return "Error Signing In: ${response.statusCode}";
+        final data = jsonDecode(response.body);
+        return data['detail'] ?? "Error Signing In: ${response.statusCode}";
       }
     } on TimeoutException catch (_) {
       return "Request timed out";
@@ -195,15 +190,27 @@ class AuthNotifier extends ChangeNotifier {
     try {
       PhoneAuthCredential credential = PhoneAuthProvider.credential(
           verificationId: verificationId, smsCode: smsCode);
+      UserCredential userCredential;
       if (_auth.currentUser != null) {
-        await _auth.currentUser!.linkWithCredential(credential);
-        notifyListeners();
-        return "Phone number linked successfully.";
+        userCredential =
+            await _auth.currentUser!.linkWithCredential(credential);
       } else {
-        await _auth.signInWithCredential(credential);
-        notifyListeners();
-        return "success";
+        userCredential = await _auth.signInWithCredential(credential);
       }
+
+      User? user = userCredential.user;
+      if (user != null) {
+        await user.reload();
+        if (!user.emailVerified) {
+          navigatorKey.currentState
+              ?.pushReplacementNamed(Routes.emailVerification);
+          return "Please verify your email before logging in.";
+        } else {
+          navigatorKey.currentState?.pushReplacementNamed(Routes.homePage);
+          return "success";
+        }
+      }
+      return "User sign-in failed";
     } on FirebaseAuthException catch (e) {
       return handleAuthException(e);
     }
@@ -293,33 +300,56 @@ class AuthNotifier extends ChangeNotifier {
           interests: [],
         );
 
-        // Send user details to the backend
-        String? result = await _sendUserDetailsToBackend(userModel, token!);
+        // Check if user exists in the backend by UID
+        bool userExists = await _checkUserExistsInBackendByUID(token!);
 
-        if (result == "success") {
-          notifyListeners();
-          return "success";
-        } else if (result == "No internet connection" ||
-            result == "Request timed out") {
-          // Handle connectivity issues
-          return "Please check your internet connection and try again.";
-        } else {
-          // Handle other errors
-          await userCredential.user?.delete();
-          return "Failed to store user details in backend: $result";
+        if (!userExists) {
+          // Send user details to the backend
+          String? result = await _sendUserDetailsToBackend(userModel, token);
+          if (result != "success") {
+            // If there's an error storing the user in the backend, delete the user from Firebase
+            await userCredential.user?.delete();
+            return result;
+          }
         }
+
+        notifyListeners();
+        return "success";
       }
       return "Google sign-in canceled";
     } on FirebaseAuthException catch (e) {
-      if (_auth.currentUser != null) {
-        await _auth.currentUser!.delete();
-      }
+      // Handle specific FirebaseAuthExceptions without deleting the user
       return handleAuthException(e);
     } catch (e) {
-      if (_auth.currentUser != null) {
-        await _auth.currentUser!.delete();
-      }
+      // General catch for any other exceptions, without deleting the user
       return e.toString();
+    }
+  }
+
+  Future<bool> _checkUserExistsInBackendByUID(String idToken) async {
+    final url = '${dotenv.env['API_BASE_URL']}/users/exists_by_uid';
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $idToken',
+    };
+
+    try {
+      final response = await http.get(
+        Uri.parse(url),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['exists'];
+      } else {
+        return false;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error checking user existence: $e');
+      }
+      return false;
     }
   }
 

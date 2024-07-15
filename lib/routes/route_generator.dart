@@ -15,8 +15,7 @@ class RouteGenerator {
       case Routes.welcomePage:
         return MaterialPageRoute(builder: (_) => const WelcomePage());
       case Routes.otpVerification:
-        final phoneNumber = settings.arguments
-            as String; // Cast the argument to the expected type
+        final phoneNumber = settings.arguments as String;
         return MaterialPageRoute(
           builder: (_) => OTPVerificationScreen(phoneNumber: phoneNumber),
         );
@@ -26,8 +25,7 @@ class RouteGenerator {
         return MaterialPageRoute(
             builder: (_) => const EmailVerificationScreen());
       default:
-        return MaterialPageRoute(
-            builder: (_) => const SignInSignUpPage()); // Default route
+        return MaterialPageRoute(builder: (_) => const SignInSignUpPage());
     }
   }
 }

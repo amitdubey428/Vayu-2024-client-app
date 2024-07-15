@@ -1,11 +1,10 @@
-// File: forms/email_verification_screen.dart
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/themes/app_theme.dart';
 import 'package:vayu_flutter_app/widgets/snackbar_util.dart';
+import 'package:vayu_flutter_app/routes/route_names.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   const EmailVerificationScreen({super.key});
@@ -16,6 +15,7 @@ class EmailVerificationScreen extends StatefulWidget {
 }
 
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
+  // ignore: unused_field
   bool _isEmailVerified = false;
 
   @override
@@ -35,41 +35,16 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           _isEmailVerified = true;
         });
         if (mounted) {
-          Navigator.of(context).pushReplacementNamed('/homePage');
+          Navigator.of(context).pushReplacementNamed(Routes.homePage);
         }
       } else {
         setState(() {
           _isEmailVerified = false;
         });
-        _showEmailVerificationDialog();
+        SnackbarUtil.showSnackbar("Please verify your email before logging in.",
+            type: SnackbarType.warning);
       }
     }
-  }
-
-  Future<void> _showEmailVerificationDialog() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Verify Your Email'),
-        content: const Text(
-            'Please verify your email before logging in. Check your inbox for the verification email.'),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await _checkEmailVerification();
-            },
-            child: const Text('Check Verification Status'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _resendEmailVerification() async {
@@ -84,8 +59,31 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     }
   }
 
+  String redactEmail(String email) {
+    final emailParts = email.split('@');
+    if (emailParts.length != 2) return email;
+
+    final localPart = emailParts[0];
+    final domainPart = emailParts[1];
+
+    String redactedLocalPart;
+    if (localPart.length <= 3) {
+      redactedLocalPart = localPart.replaceRange(
+          1, localPart.length, '*' * (localPart.length - 1));
+    } else {
+      redactedLocalPart = localPart.replaceRange(
+          1, localPart.length - 1, '*' * (localPart.length - 2));
+    }
+
+    return '$redactedLocalPart@$domainPart';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final authNotifier = Provider.of<AuthNotifier>(context);
+    final user = authNotifier.currentUser;
+    final redactedEmail = user != null ? redactEmail(user.email!) : "";
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: DecoratedBox(
@@ -105,12 +103,13 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Spacer(),
-                        const Padding(
-                          padding: EdgeInsets.only(left: 20.0, right: 20.0),
+                        Padding(
+                          padding:
+                              const EdgeInsets.only(left: 20.0, right: 20.0),
                           child: Text(
-                            'Verify Your Email',
+                            'Verify Your Email: $redactedEmail',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                               color: Colors.black,
@@ -123,6 +122,13 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                           child: ElevatedButton(
                             onPressed: _resendEmailVerification,
                             child: const Text('Resend Email Verification'),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(10.0),
+                          child: ElevatedButton(
+                            onPressed: _checkEmailVerification,
+                            child: const Text('Check Verification Status'),
                           ),
                         ),
                         const Spacer(),
