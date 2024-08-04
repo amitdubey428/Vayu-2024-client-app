@@ -208,10 +208,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
       _isChangingPhoneNumber = true;
     });
 
+    final authNotifier = getIt<AuthNotifier>();
     String newPhoneNumber =
         '${_selectedCountryCode.dialCode}${_phoneNumberController.text}';
     String? result =
-        await _authNotifier.initiatePhoneNumberUpdate(newPhoneNumber);
+        await authNotifier.initiatePhoneNumberUpdate(newPhoneNumber);
 
     setState(() {
       _isChangingPhoneNumber = false;
