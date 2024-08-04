@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:vayu_flutter_app/di/service_locator.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/widgets/custom_count_down_timer.dart';
 import 'package:vayu_flutter_app/widgets/custom_text_form_field.dart';
 import 'package:vayu_flutter_app/widgets/snackbar_util.dart';
+import 'package:vayu_flutter_app/utils/country_codes.dart';
 
 class SignInForm extends StatefulWidget {
   const SignInForm({super.key});
@@ -30,6 +31,11 @@ class _SignInFormState extends State<SignInForm> {
 
   final Duration _otpResendTime = const Duration(seconds: 30);
   late Duration _currentOtpResendTime;
+
+  bool _isLoading = false;
+
+  CountryCode _selectedCountryCode =
+      countryCodes.firstWhere((c) => c.code == "IN");
 
   @override
   void initState() {
@@ -60,23 +66,40 @@ class _SignInFormState extends State<SignInForm> {
     _isOtpValid.value = _otpController.text.length == 6;
   }
 
-  void _signInWithEmail() async {
+  Future<void> _signInWithEmail() async {
     if (_formKey.currentState!.validate()) {
-      var authNotifier = Provider.of<AuthNotifier>(context, listen: false);
-      String? result = await authNotifier.signInWithEmailPassword(
-          _emailController.text, _passwordController.text);
+      setState(() => _isLoading = true);
+      try {
+        var authNotifier = getIt<AuthNotifier>();
+        String? result = await authNotifier.signInWithEmailPassword(
+            _emailController.text, _passwordController.text);
 
-      SnackbarType snackbarType =
-          result == "success" ? SnackbarType.success : SnackbarType.error;
-      SnackbarUtil.showSnackbar(result ?? "Log in failed", type: snackbarType);
+        if (mounted) {
+          if (result == "success") {
+            Navigator.of(context).pushReplacementNamed('/homePage');
+          } else {
+            SnackbarUtil.showSnackbar(result ?? "Log in failed",
+                type: SnackbarType.error);
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          SnackbarUtil.showSnackbar("An unexpected error occurred",
+              type: SnackbarType.error);
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     }
   }
 
   void _sendOtp() async {
     if (_canSendOtp.value && _otpResendCount < 3) {
-      var authNotifier = Provider.of<AuthNotifier>(context, listen: false);
-      bool userExists = await authNotifier
-          .doesUserExistByPhone('+91${_mobileController.text}');
+      var authNotifier = getIt<AuthNotifier>();
+      bool userExists = await authNotifier.doesUserExistByPhone(
+          '${_selectedCountryCode.dialCode}${_mobileController.text}');
 
       if (!userExists) {
         SnackbarUtil.showSnackbar("User not found! Please register :)",
@@ -96,7 +119,7 @@ class _SignInFormState extends State<SignInForm> {
       _countdownKey.currentState?.resetTimer();
 
       authNotifier.verifyPhoneNumber(
-        '+91${_mobileController.text}',
+        '${_selectedCountryCode.dialCode}${_mobileController.text}',
         (verificationId) {
           setState(() {
             _verificationId = verificationId;
@@ -119,7 +142,7 @@ class _SignInFormState extends State<SignInForm> {
   }
 
   void _verifyOtp() async {
-    var authNotifier = Provider.of<AuthNotifier>(context, listen: false);
+    var authNotifier = getIt<AuthNotifier>();
     String? result = await authNotifier.signInOrLinkWithOTP(
         _verificationId, _otpController.text);
     SnackbarUtil.showSnackbar(result ?? "OTP verification failed",
@@ -158,7 +181,9 @@ class _SignInFormState extends State<SignInForm> {
         ),
         ElevatedButton(
           onPressed: _signInWithEmail,
-          child: const Text('Log In'),
+          child: _isLoading
+              ? const CircularProgressIndicator()
+              : const Text('Log In'),
         ),
         TextButton(
           onPressed: () => setState(() => _isOtpMode = true),
@@ -171,20 +196,36 @@ class _SignInFormState extends State<SignInForm> {
   Widget _buildSignInWithOtp() {
     return Column(
       children: [
-        CustomTextFormField(
-          controller: _mobileController,
-          labelText: 'Mobile Number',
-          hintText: 'Enter your 10 digits mobile number',
-          keyboardType: TextInputType.phone,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter your mobile number';
-            }
-            if (value.length != 10) {
-              return 'Enter a valid 10 digit number';
-            }
-            return null;
-          },
+        Row(
+          children: [
+            Flexible(
+              flex: 1, // Set a fixed width for the CountryCodePicker
+              child: CountryCodePicker(
+                initialSelection: _selectedCountryCode,
+                onChanged: (CountryCode countryCode) {
+                  setState(() {
+                    _selectedCountryCode = countryCode;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 2,
+              child: CustomTextFormField(
+                controller: _mobileController,
+                labelText: 'Mobile Number',
+                hintText: 'Enter your mobile number',
+                keyboardType: TextInputType.phone,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your mobile number';
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ],
         ),
         if (_isOtpSent)
           CustomTextFormField(
@@ -244,10 +285,13 @@ class _SignInFormState extends State<SignInForm> {
   Widget build(BuildContext context) {
     return Form(
       key: _formKey,
-      child: Column(
-        children: [
-          _isOtpMode ? _buildSignInWithOtp() : _buildSignInWithEmail(),
-        ],
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min, // Ensure this is set
+          children: [
+            _isOtpMode ? _buildSignInWithOtp() : _buildSignInWithEmail(),
+          ],
+        ),
       ),
     );
   }

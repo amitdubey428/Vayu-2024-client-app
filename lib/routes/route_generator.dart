@@ -15,9 +15,9 @@ class RouteGenerator {
       case Routes.welcomePage:
         return MaterialPageRoute(builder: (_) => const WelcomePage());
       case Routes.otpVerification:
-        final phoneNumber = settings.arguments as String;
+        final args = settings.arguments as OTPScreenArguments;
         return MaterialPageRoute(
-          builder: (_) => OTPVerificationScreen(phoneNumber: phoneNumber),
+          builder: (_) => OTPVerificationScreen(args: args),
         );
       case Routes.homePage:
         return MaterialPageRoute(builder: (_) => const TemporaryHomePage());

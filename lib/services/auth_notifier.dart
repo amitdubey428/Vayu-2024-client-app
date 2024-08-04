@@ -2,57 +2,223 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vayu_flutter_app/models/user_model.dart';
 import 'package:vayu_flutter_app/routes/route_names.dart';
+import 'package:vayu_flutter_app/screens/auth/otp_verification_screen.dart';
+import 'package:vayu_flutter_app/services/api_service.dart';
 import 'package:vayu_flutter_app/utils/globals.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:developer' as developer;
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:workmanager/workmanager.dart';
 
 /// AuthNotifier handles authentication related tasks and state management.
 class AuthNotifier extends ChangeNotifier {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseAuth _auth;
+  final SharedPreferences _prefs;
+  final GoogleSignIn _googleSignIn;
+  final ApiService _apiService;
 
   User? get currentUser => _auth.currentUser;
   String? _phoneNumberForOtp;
-
-  /// Returns the phone number for OTP.
   String? get phoneNumberForOtp => _phoneNumberForOtp;
+  UserModel? _pendingRegistration;
+  UserModel? get pendingRegistration => _pendingRegistration;
+  String? _pendingPhoneNumber;
+  String? get pendingPhoneNumber => _pendingPhoneNumber;
+
+  bool _isNewlyRegistered = false;
+  bool get isNewlyRegistered => _isNewlyRegistered;
+
+  String? _verificationId;
+
+  AuthNotifier(this._auth, this._prefs, this._googleSignIn, this._apiService) {
+    _initPrefs();
+  }
+
+  Future<void> initializeApp() async {
+    await _initPrefs();
+    await _loadPendingRegistration();
+    await syncUserData();
+    // Check if there's a pending OTP verification
+    bool isVerifyingOTP = await this.isVerifyingOTP();
+    String? storedPhone = await getStoredOTPVerificationPhone();
+    if (isVerifyingOTP && storedPhone != null) {
+      setPhoneNumberForOtp(storedPhone);
+    }
+    notifyListeners();
+  }
+
+  Future<String?> initiatePhoneNumberUpdate(String newPhoneNumber) async {
+    try {
+      bool userExists = await _apiService.doesUserExistByPhone(newPhoneNumber);
+      if (userExists) {
+        return "Phone number is already in use";
+      }
+
+      _pendingPhoneNumber = newPhoneNumber;
+      _verificationId = null; // Clear existing verification ID
+      notifyListeners();
+
+      await verifyPhoneNumber(
+        newPhoneNumber,
+        (verificationId) {
+          _verificationId = verificationId;
+          notifyListeners();
+        },
+        (e) => throw e,
+      );
+
+      return "OTP sent successfully";
+    } catch (e) {
+      _pendingPhoneNumber = null;
+      if (e is FirebaseAuthException) {
+        return handleAuthException(e);
+      }
+      return "An error occurred while initiating phone number update: ${e.toString()}";
+    }
+  }
+
+  Future<String?> confirmPhoneNumberUpdate(
+      String verificationId, String otp) async {
+    if (_pendingPhoneNumber == null) {
+      return "No pending phone number update";
+    }
+
+    try {
+      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+          verificationId: _verificationId!, smsCode: otp);
+
+      await _auth.currentUser?.updatePhoneNumber(credential);
+
+      String? idToken = await _auth.currentUser?.getIdToken();
+      if (idToken == null) {
+        throw Exception("Failed to get ID token");
+      }
+
+      // Create a minimal UserModel with just the updated phone number
+      UserModel updatedUser = UserModel(
+          uid: _auth.currentUser!.uid,
+          firstName: "", // These fields are required but won't be updated
+          lastName: "",
+          email: "",
+          birthDate: DateTime.now(),
+          mobileNumber: _pendingPhoneNumber);
+      String result = await _apiService.updateUser(updatedUser, idToken);
+      if (result == "success") {
+        _phoneNumberForOtp = _pendingPhoneNumber;
+        _pendingPhoneNumber = null;
+        _verificationId = null;
+        notifyListeners();
+        return "Phone number updated successfully";
+      } else {
+        throw Exception(result);
+      }
+    } catch (e) {
+      if (e is FirebaseAuthException) {
+        return handleAuthException(e);
+      }
+      return "An error occurred while confirming phone number update: ${e.toString()}";
+    }
+  }
+
+  Future<void> saveOTPVerificationState(String phoneNumber) async {
+    await _prefs.setString('otp_verification_phone', phoneNumber);
+    await _prefs.setBool('is_verifying_otp', true);
+  }
+
+  Future<void> clearOTPVerificationState() async {
+    await _prefs.remove('otp_verification_phone');
+    await _prefs.remove('is_verifying_otp');
+    _phoneNumberForOtp = null;
+    _verificationId = null;
+    notifyListeners();
+  }
+
+  Future<void> deleteIncompleteRegistration() async {
+    try {
+      User? user = _auth.currentUser;
+      if (user != null) {
+        String? idToken = await user.getIdToken();
+
+        // Delete from backend
+        if (idToken != null) {
+          await _apiService.deleteUser(idToken);
+        }
+
+        // Delete from Firebase Auth
+        await user.delete();
+      }
+
+      // Clear local state
+      _pendingRegistration = null;
+      _phoneNumberForOtp = null;
+      _pendingPhoneNumber = null;
+      _verificationId = null;
+      notifyListeners();
+    } catch (e) {
+      developer.log("Error deleting incomplete registration: $e");
+      // Consider logging this error or notifying the user
+    }
+  }
+
+  Future<String> sendEmailVerification() async {
+    try {
+      User? user = _auth.currentUser;
+      if (user != null && !user.emailVerified) {
+        await user.sendEmailVerification();
+        return "Verification email sent successfully";
+      }
+      return "User is already verified or not logged in";
+    } catch (e) {
+      developer.log("Error sending email verification: $e",
+          name: 'auth', error: e);
+      return "Failed to send verification email: ${e.toString()}";
+    }
+  }
+
+  Future<void> _loadPendingRegistration() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pendingRegistrationJson = prefs.getString('pending_registration');
+    if (pendingRegistrationJson != null) {
+      _pendingRegistration = UserModel.fromJson(pendingRegistrationJson);
+    }
+  }
+
+  Future<void> _initPrefs() async {
+    // You can initialize any state here if needed
+    notifyListeners();
+  }
 
   /// Sets the phone number for OTP.
-  void setPhoneNumberForOtp(String phoneNumber) {
+  void setPhoneNumberForOtp(String? phoneNumber) {
     _phoneNumberForOtp = phoneNumber;
     notifyListeners();
   }
 
   /// Prints the current user's token for debugging purposes.
   Future<void> printCurrentUserToken() async {
-    if (currentUser != null) {
-      String? token = await currentUser!.getIdToken();
-      if (kDebugMode) {
+    try {
+      if (currentUser != null) {
+        String? token = await currentUser!.getIdToken();
         developer.log("Firebase Auth Token: $token", name: 'auth');
+      } else {
+        developer.log("No user is currently logged in.", name: 'auth');
       }
-    } else {
-      if (kDebugMode) {
-        print("No user is currently logged in.");
-      }
+    } catch (e) {
+      developer.log("Error getting user token: $e", name: 'auth', error: e);
     }
   }
 
   /// Checks if a user exists by phone number.
   Future<bool> doesUserExistByPhone(String phoneNumber) async {
-    final encodedPhoneNumber = Uri.encodeQueryComponent(phoneNumber);
-    final url =
-        '${dotenv.env['API_BASE_URL']}/users/exists_by_phone?phone=$encodedPhoneNumber';
-    final response = await http.get(Uri.parse(url));
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['exists'];
-    } else {
+    try {
+      return await _apiService.doesUserExistByPhone(phoneNumber);
+    } catch (e) {
+      developer.log("Error checking user existence: $e",
+          name: 'auth', error: e);
       return false;
     }
   }
@@ -60,35 +226,141 @@ class AuthNotifier extends ChangeNotifier {
   /// Registers a new user with email and password.
   Future<String?> registerWithEmailPassword(
       String email, String password, UserModel userDetails) async {
+    User? user;
     try {
       UserCredential userCredential =
           await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      User? user = userCredential.user;
+      user = userCredential.user;
 
-      if (user != null) {
-        String? idToken = await user.getIdToken();
-        String? result = await _sendUserDetailsToBackend(userDetails, idToken!);
+      if (user == null) {
+        return "User creation failed";
+      }
 
-        if (result != "success") {
-          await user.delete();
-          return result;
-        }
+      String? idToken = await user.getIdToken();
+      bool userExists = await _apiService
+          .doesUserExistByPhone(userDetails.mobileNumber!)
+          .timeout(const Duration(seconds: 10), onTimeout: () {
+        throw TimeoutException('Backend request timed out');
+      });
+
+      if (userExists) {
+        await user.delete();
+        return "User with this phone number already exists";
+      }
+
+      String? result = await _sendUserDetailsToBackend(userDetails, idToken!)
+          .timeout(const Duration(seconds: 10), onTimeout: () {
+        throw TimeoutException('Backend request timed out');
+      });
+
+      if (result != "success") {
+        await user.delete();
+        return result;
+      }
+
+      if (result == "success") {
+        _pendingRegistration = userDetails;
+        await _savePendingRegistration();
         setPhoneNumberForOtp(userDetails.mobileNumber!);
-        await user.sendEmailVerification();
+        _isNewlyRegistered = true;
+        notifyListeners();
         navigatorKey.currentState?.pushReplacementNamed(
-          '/otpVerification',
-          arguments: userDetails.mobileNumber,
+          Routes.otpVerification,
+          arguments: OTPScreenArguments(
+            phoneNumber: userDetails.mobileNumber!,
+            isNewUser: true,
+          ),
         );
         return "success";
       }
-      return "User creation failed";
     } on FirebaseAuthException catch (e) {
+      await user?.delete();
       return handleAuthException(e);
+    } on TimeoutException {
+      await user?.delete();
+      return "Registration failed. Please try again.";
     } catch (e) {
-      return e.toString();
+      await user?.delete();
+      developer.log("Error during registration: $e", name: 'auth', error: e);
+      if (user != null) {
+        String? idToken = await user.getIdToken();
+        if (idToken != null) {
+          await _apiService.deleteUser(idToken);
+        }
+      }
+      return "An unexpected error occurred during registration";
+    }
+    return null;
+  }
+
+  void resetNewlyRegisteredFlag() {
+    // Use a post-frame callback to reset the flag
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isNewlyRegistered = false;
+      notifyListeners();
+    });
+  }
+
+  Future<void> _savePendingRegistration() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_pendingRegistration != null) {
+      await prefs.setString(
+          'pending_registration', _pendingRegistration!.toJson());
+    }
+  }
+
+  Future<void> clearPendingRegistration() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('pending_registration');
+    _pendingRegistration = null;
+    notifyListeners();
+  }
+
+  Future<String?> updatePhoneNumber(String newPhoneNumber) async {
+    try {
+      User? user = _auth.currentUser;
+      if (user == null) {
+        return "User not authenticated";
+      }
+
+      bool userExists = await _apiService.doesUserExistByPhone(newPhoneNumber);
+      if (userExists) {
+        return "Phone number is already in use";
+      }
+
+      String? idToken = await user.getIdToken();
+      String? result =
+          await _apiService.updateUser(_pendingRegistration!, idToken!);
+      if (result != "success") {
+        return result;
+      }
+
+      // Update pending registration
+      if (_pendingRegistration != null) {
+        _pendingRegistration!.mobileNumber = newPhoneNumber;
+        await _savePendingRegistration();
+      }
+
+      await verifyPhoneNumber(
+        newPhoneNumber,
+        (verificationId) {
+          // Handle successful sending of verification code
+          _verificationId = verificationId;
+          _phoneNumberForOtp = newPhoneNumber;
+          notifyListeners();
+        },
+        (e) => throw e,
+      );
+
+      return "success";
+    } catch (e) {
+      if (e is FirebaseAuthException) {
+        return handleAuthException(e);
+      }
+      return "An error occurred while updating phone number: ${e.toString()}";
     }
   }
 
@@ -102,37 +374,12 @@ class AuthNotifier extends ChangeNotifier {
       return "No internet connection";
     }
 
-    final url = '${dotenv.env['API_BASE_URL']}/users/create_user';
-    final headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $idToken',
-    };
-    final body = jsonEncode(userDetails.toMap());
-
     try {
-      final response = await http
-          .post(
-            Uri.parse(url),
-            headers: headers,
-            body: body,
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return "success";
-      } else {
-        final data = jsonDecode(response.body);
-        return data['detail'] ?? "Error Signing In: ${response.statusCode}";
-      }
-    } on TimeoutException catch (_) {
-      return "Request timed out";
-    } on SocketException catch (_) {
-      return "No internet connection";
+      return await _apiService.createUser(userDetails.toMap(), idToken);
     } catch (e) {
-      if (kDebugMode) {
-        print('Unexpected error: $e');
-      }
-      return "Unexpected error occurred";
+      developer.log("Error sending user details to backend: $e",
+          name: 'auth', error: e);
+      return "Error sending user details to backend";
     }
   }
 
@@ -154,34 +401,65 @@ class AuthNotifier extends ChangeNotifier {
       return "success";
     } on FirebaseAuthException catch (e) {
       return handleAuthException(e);
+    } catch (e) {
+      developer.log("Error during sign in: $e", name: 'auth', error: e);
+      return "An unexpected error occurred during sign in";
     }
   }
 
   /// Logs out the current user.
   Future<void> logout() async {
-    await _auth.signOut();
-    _phoneNumberForOtp = null;
-    notifyListeners();
-    navigatorKey.currentState?.pushReplacementNamed('/signInSignUpPage');
+    try {
+      await _auth.signOut();
+      _phoneNumberForOtp = null;
+      _pendingRegistration = null;
+      await clearPendingRegistration();
+      notifyListeners();
+      navigatorKey.currentState?.pushReplacementNamed(Routes.signInSignUpPage);
+    } catch (e) {
+      developer.log("Error during logout: $e", name: 'auth', error: e);
+    }
   }
 
   /// Verifies the phone number and sends an OTP.
-  Future<void> verifyPhoneNumber(
+  Future<String?> verifyPhoneNumber(
       String phoneNumber,
       Function(String verificationId) onCodeSent,
       Function(FirebaseAuthException e) onVerificationFailed) async {
-    await _auth.verifyPhoneNumber(
-      phoneNumber: phoneNumber,
-      verificationCompleted: (PhoneAuthCredential credential) async {
-        await _auth.signInWithCredential(credential);
-        notifyListeners();
-      },
-      verificationFailed: onVerificationFailed,
-      codeSent: (String verificationId, int? resendToken) {
-        onCodeSent(verificationId);
-      },
-      codeAutoRetrievalTimeout: (String verificationId) {},
-    );
+    try {
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          await _auth.signInWithCredential(credential);
+          notifyListeners();
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          developer.log("Phone verification failed: ${e.message}",
+              name: 'auth');
+          onVerificationFailed(e);
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          developer.log("Verification code sent with ID: $verificationId",
+              name: 'auth');
+          _verificationId = verificationId;
+          onCodeSent(verificationId);
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          developer.log("Auto retrieval timeout", name: 'auth');
+          _verificationId = verificationId;
+        },
+        timeout: const Duration(seconds: 60),
+      );
+      return _verificationId;
+    } catch (e) {
+      developer.log("Error during phone verification: $e",
+          name: 'auth', error: e);
+      onVerificationFailed(FirebaseAuthException(
+        code: 'unknown',
+        message: 'An unexpected error occurred during phone verification',
+      ));
+      return null;
+    }
   }
 
   /// Signs in or links a phone number with OTP.
@@ -213,35 +491,55 @@ class AuthNotifier extends ChangeNotifier {
       return "User sign-in failed";
     } on FirebaseAuthException catch (e) {
       return handleAuthException(e);
+    } catch (e) {
+      developer.log("Error during OTP sign-in/link: $e",
+          name: 'auth', error: e);
+      return "An unexpected error occurred during OTP sign-in/link";
     }
   }
 
-  /// Verifies the OTP.
-  Future<bool> verifyOTP(String verificationId, String smsCode) async {
-    if (_auth.currentUser != null) {
-      final String? result = await linkPhoneNumber(verificationId, smsCode);
-      if (result == "Phone number linked successfully") {
-        notifyListeners();
-        return true;
+  Future<bool> isVerifyingOTP() async {
+    return _prefs.getBool('is_verifying_otp') ?? false;
+  }
+
+  Future<String?> getStoredOTPVerificationPhone() async {
+    return _prefs.getString('otp_verification_phone');
+  }
+
+  Future<String?> verifyOTP(String verificationId, String otp) async {
+    try {
+      developer.log("Verifying OTP with verificationId: $verificationId",
+          name: 'auth');
+      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+          verificationId: _verificationId!, smsCode: otp);
+
+      if (_auth.currentUser != null) {
+        await _auth.currentUser!.updatePhoneNumber(credential);
       } else {
-        if (kDebugMode) {
-          print(result);
-        }
-        return false;
-      }
-    } else {
-      try {
-        PhoneAuthCredential credential = PhoneAuthProvider.credential(
-            verificationId: verificationId, smsCode: smsCode);
         await _auth.signInWithCredential(credential);
-        notifyListeners();
-        return true;
-      } on FirebaseAuthException catch (e) {
-        if (kDebugMode) {
-          print(e.message);
-        }
-        return false;
       }
+
+      await clearPendingRegistration();
+      await clearOTPVerificationState();
+
+      User? user = _auth.currentUser;
+      if (user != null && !user.emailVerified) {
+        await sendEmailVerification(); // Send verification email
+        navigatorKey.currentState
+            ?.pushReplacementNamed(Routes.emailVerification);
+      } else {
+        navigatorKey.currentState?.pushReplacementNamed(Routes.homePage);
+      }
+
+      notifyListeners();
+      return "success";
+    } on FirebaseAuthException catch (e) {
+      developer.log("Firebase Auth Error verifying OTP: $e",
+          name: 'auth', error: e);
+      return handleAuthException(e);
+    } catch (e) {
+      developer.log("Error verifying OTP: $e", name: 'auth', error: e);
+      return "An error occurred during OTP verification: ${e.toString()}";
     }
   }
 
@@ -256,13 +554,16 @@ class AuthNotifier extends ChangeNotifier {
       return "Phone number linked successfully";
     } on FirebaseAuthException catch (e) {
       return handleAuthException(e);
+    } catch (e) {
+      developer.log("Error linking phone number: $e", name: 'auth', error: e);
+      return "An unexpected error occurred while linking phone number";
     }
   }
 
   /// Signs in with Google.
   Future<String?> signInWithGoogle() async {
     try {
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser != null) {
         final GoogleSignInAuthentication googleAuth =
             await googleUser.authentication;
@@ -274,18 +575,20 @@ class AuthNotifier extends ChangeNotifier {
             await _auth.signInWithCredential(credential);
         String? token = await userCredential.user?.getIdToken();
 
+        if (token == null) {
+          throw Exception("Failed to get ID token");
+        }
+
         // Extract user details from Google account
         String uid = userCredential.user?.uid ?? "";
         String email = googleUser.email;
         String displayName = googleUser.displayName ?? "";
 
-        // Assuming you can split displayName into firstName and lastName
         List<String> nameParts = displayName.split(' ');
         String firstName = nameParts.isNotEmpty ? nameParts[0] : "";
         String lastName =
             nameParts.length > 1 ? nameParts.sublist(1).join(' ') : "";
 
-        // Create a user model with the extracted details
         UserModel userModel = UserModel(
           uid: uid,
           firstName: firstName,
@@ -300,16 +603,27 @@ class AuthNotifier extends ChangeNotifier {
           interests: [],
         );
 
+        await _storeUserInfoLocally(userModel);
+
         // Check if user exists in the backend by UID
-        bool userExists = await _checkUserExistsInBackendByUID(token!);
+        bool userExists = await _checkUserExistsInBackendByUID(token)
+            .timeout(const Duration(seconds: 10), onTimeout: () {
+          throw TimeoutException('Backend request timed out');
+        });
 
         if (!userExists) {
           // Send user details to the backend
-          String? result = await _sendUserDetailsToBackend(userModel, token);
+          String? result = await _sendUserDetailsToBackend(userModel, token)
+              .timeout(const Duration(seconds: 10), onTimeout: () {
+            throw TimeoutException('Backend request timed out');
+          });
+
           if (result != "success") {
-            // If there's an error storing the user in the backend, delete the user from Firebase
-            await userCredential.user?.delete();
-            return result;
+            developer.log("Error storing user in backend: $result",
+                name: 'auth');
+            await _scheduleUserDataSync();
+            await _handleSignInFailure();
+            return "Error: Unable to complete sign-in process";
           }
         }
 
@@ -317,39 +631,125 @@ class AuthNotifier extends ChangeNotifier {
         return "success";
       }
       return "Google sign-in canceled";
-    } on FirebaseAuthException catch (e) {
-      // Handle specific FirebaseAuthExceptions without deleting the user
-      return handleAuthException(e);
+    } on TimeoutException {
+      developer.log("Backend request timed out", name: 'auth');
+      await _handleSignInFailure();
+      return "Error: Unable to connect to the server. Please try again later.";
     } catch (e) {
-      // General catch for any other exceptions, without deleting the user
-      return e.toString();
+      developer.log("Unexpected error during Google sign-in: $e",
+          name: 'auth', error: e);
+      await _handleSignInFailure();
+      return "Error: Unable to complete sign-in process";
+    }
+  }
+
+  Future<void> _handleSignInFailure() async {
+    try {
+      await _auth.signOut();
+      await _googleSignIn.signOut();
+      notifyListeners();
+    } catch (e) {
+      developer.log("Error during sign-out after failure: $e",
+          name: 'auth', error: e);
+    }
+  }
+
+  Future<void> _storeUserInfoLocally(UserModel userModel) async {
+    try {
+      await _prefs.setString('user_info', jsonEncode(userModel.toMap()));
+      await _prefs.setInt(
+          'user_info_timestamp', DateTime.now().millisecondsSinceEpoch);
+    } catch (e) {
+      developer.log("Error storing user info locally: $e",
+          name: 'auth', error: e);
+    }
+  }
+
+  Future<void> _scheduleUserDataSync() async {
+    try {
+      await _prefs.setBool('needs_sync', true);
+      await Workmanager().registerOneOffTask(
+        "1",
+        "syncUserData",
+        initialDelay: const Duration(seconds: 10),
+        constraints: Constraints(
+          networkType: NetworkType.connected,
+        ),
+      );
+    } catch (e) {
+      developer.log("Error scheduling user data sync: $e",
+          name: 'auth', error: e);
+    }
+  }
+
+  Future<void> syncUserData() async {
+    try {
+      bool needsSync = _prefs.getBool('needs_sync') ?? false;
+      if (!needsSync) return;
+
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      final token = await user.getIdToken();
+      final userExists = await _checkUserExistsInBackendByUID(token!)
+          .timeout(const Duration(seconds: 10), onTimeout: () {
+        throw TimeoutException('Backend request timed out');
+      });
+
+      if (!userExists) {
+        String? storedUserInfo = _prefs.getString('user_info');
+        int? storedTimestamp = _prefs.getInt('user_info_timestamp');
+        int lastSyncTimestamp = _prefs.getInt('last_sync_timestamp') ?? 0;
+
+        if (storedUserInfo != null &&
+            storedTimestamp != null &&
+            storedTimestamp > lastSyncTimestamp) {
+          UserModel userModel = UserModel.fromMap(jsonDecode(storedUserInfo));
+          final result = await _sendUserDetailsToBackend(userModel, token)
+              .timeout(const Duration(seconds: 10), onTimeout: () {
+            throw TimeoutException('Backend request timed out');
+          });
+
+          if (result == "success") {
+            await _prefs.setBool('needs_sync', false);
+            await _prefs.setInt(
+                'last_sync_timestamp', DateTime.now().millisecondsSinceEpoch);
+          } else {
+            developer.log("Failed to sync user data: $result", name: 'auth');
+            await _scheduleUserDataSync();
+          }
+        }
+      } else {
+        await _prefs.setBool('needs_sync', false);
+        await _prefs.setInt(
+            'last_sync_timestamp', DateTime.now().millisecondsSinceEpoch);
+      }
+    } on TimeoutException {
+      developer.log("Backend request timed out during sync", name: 'auth');
+      await _scheduleUserDataSync();
+    } catch (e) {
+      developer.log("Error syncing user data: $e", name: 'auth', error: e);
+      await _scheduleUserDataSync();
     }
   }
 
   Future<bool> _checkUserExistsInBackendByUID(String idToken) async {
-    final url = '${dotenv.env['API_BASE_URL']}/users/exists_by_uid';
-    final headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $idToken',
-    };
-
     try {
-      final response = await http.get(
-        Uri.parse(url),
-        headers: headers,
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['exists'];
-      } else {
-        return false;
-      }
+      developer.log(
+          'Sending request to backend with token: ${idToken.substring(0, 10)}...',
+          name: 'auth');
+      return await _apiService.checkUserExistsByUID(idToken);
     } catch (e) {
-      if (kDebugMode) {
-        print('Error checking user existence: $e');
+      if (e is SocketException) {
+        developer.log('Backend connection error: $e', name: 'auth', error: e);
+        throw Exception(
+            'Unable to connect to the server. Please check your internet connection and try again.');
+      } else {
+        developer.log('Error checking user existence: $e',
+            name: 'auth', error: e);
+        throw Exception(
+            'An unexpected error occurred. Please try again later.');
       }
-      return false;
     }
   }
 

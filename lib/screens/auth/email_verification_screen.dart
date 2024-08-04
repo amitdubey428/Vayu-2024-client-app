@@ -1,6 +1,8 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:vayu_flutter_app/di/service_locator.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/themes/app_theme.dart';
 import 'package:vayu_flutter_app/widgets/snackbar_util.dart';
@@ -17,46 +19,64 @@ class EmailVerificationScreen extends StatefulWidget {
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   // ignore: unused_field
   bool _isEmailVerified = false;
+  late AuthNotifier _authNotifier;
+  bool _isChecking = false;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
+    _authNotifier = getIt<AuthNotifier>();
     _checkEmailVerification();
+    // Periodically check email verification status
+    _timer = Timer.periodic(
+        const Duration(seconds: 25), (_) => _checkEmailVerification());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   Future<void> _checkEmailVerification() async {
-    final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
-    User? user = authNotifier.currentUser;
+    if (!mounted) return;
+
+    setState(() => _isChecking = true);
+
+    User? user = _authNotifier.currentUser;
 
     if (user != null) {
       await user.reload();
       if (user.emailVerified) {
-        setState(() {
-          _isEmailVerified = true;
-        });
+        _timer?.cancel();
         if (mounted) {
+          setState(() {
+            _isEmailVerified = true;
+          });
           Navigator.of(context).pushReplacementNamed(Routes.homePage);
         }
       } else {
-        setState(() {
-          _isEmailVerified = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isEmailVerified = false;
+          });
+        }
         SnackbarUtil.showSnackbar("Please verify your email before logging in.",
             type: SnackbarType.warning);
       }
     }
+    if (mounted) setState(() => _isChecking = false);
   }
 
   Future<void> _resendEmailVerification() async {
-    final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
-    User? user = authNotifier.currentUser;
-
-    if (user != null) {
-      await user.sendEmailVerification();
-      SnackbarUtil.showSnackbar(
-          "Verification email sent. Please check your inbox.",
-          type: SnackbarType.informative);
-    }
+    String result = await _authNotifier.sendEmailVerification();
+    SnackbarUtil.showSnackbar(
+      result,
+      type: result.contains("successfully")
+          ? SnackbarType.success
+          : SnackbarType.error,
+    );
   }
 
   String redactEmail(String email) {
@@ -80,8 +100,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authNotifier = Provider.of<AuthNotifier>(context);
-    final user = authNotifier.currentUser;
+    final user = _authNotifier.currentUser;
     final redactedEmail = user != null ? redactEmail(user.email!) : "";
 
     return Scaffold(
@@ -139,6 +158,10 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                 ),
               ),
             ),
+            if (_isChecking)
+              const Center(
+                child: CircularProgressIndicator(),
+              ),
           ],
         ),
       ),

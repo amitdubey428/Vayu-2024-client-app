@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
+import 'package:vayu_flutter_app/di/service_locator.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/themes/app_theme.dart';
 import 'package:vayu_flutter_app/utils/globals.dart';
-import 'package:flutter_signin_button/flutter_signin_button.dart';
 import 'package:vayu_flutter_app/screens/auth/forms/sign_in_form.dart';
 import 'package:vayu_flutter_app/screens/auth/forms/sign_up_form.dart';
 import 'package:vayu_flutter_app/widgets/snackbar_util.dart';
@@ -18,8 +17,8 @@ class SignInSignUpPage extends StatefulWidget {
 
 class _SignInSignUpPageState extends State<SignInSignUpPage>
     with SingleTickerProviderStateMixin {
-  bool isFront =
-      true; // To keep track of the form displayed: true for SignIn, false for SignUp
+  bool _isLoading = false;
+  bool isFront = true;
   late AnimationController _animationController;
 
   @override
@@ -70,99 +69,108 @@ class _SignInSignUpPageState extends State<SignInSignUpPage>
                   constraints: BoxConstraints(
                     minHeight: screenHeight,
                   ),
-                  child: IntrinsicHeight(
-                    child: Center(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 500),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Spacer(),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(20, 30, 20, 20),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: screenWidth *
-                                        0.3, // 40% of the screen width
-                                    height: screenWidth *
-                                        0.3, // Keeping aspect ratio the same
-                                    child: Image.asset(
-                                      'assets/icons/app_icon.png',
-                                      fit: BoxFit.contain,
-                                    ),
+                  child: Center(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 500),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 30, 20, 20),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: screenWidth * 0.3,
+                                  height: screenWidth * 0.3,
+                                  child: Image.asset(
+                                    'assets/icons/app_icon.png',
+                                    fit: BoxFit.contain,
                                   ),
-                                  Text(
-                                    isFront ? 'Welcome' : 'Create Your Account',
-                                    textAlign: TextAlign.center,
-                                    style: GoogleFonts.notoSans(
-                                      textStyle: const TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Center(
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxWidth: screenWidth * 0.9,
                                 ),
-                                child: AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 500),
-                                    child: isFront
-                                        ? const SignInForm()
-                                        : const SignUpForm()),
+                                Text(
+                                  isFront ? 'Welcome' : 'Create Your Account',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.notoSans(
+                                    textStyle: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: SizedBox(
+                              width:
+                                  screenWidth - 40, // Full width minus padding
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 500),
+                                child: isFront
+                                    ? const SignInForm()
+                                    : const SignUpForm(),
                               ),
                             ),
-                            const Spacer(),
-                            Padding(
-                              padding: const EdgeInsets.only(top: 20.0),
-                              child: SignInButton(
-                                Buttons.GoogleDark,
-                                onPressed: () async {
-                                  final authNotifier =
-                                      Provider.of<AuthNotifier>(context,
-                                          listen: false);
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 20.0),
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                setState(() => _isLoading = true);
+                                try {
+                                  final authNotifier = getIt<AuthNotifier>();
                                   String? result =
                                       await authNotifier.signInWithGoogle();
                                   if (result == "success") {
-                                    // Navigate to home page or other appropriate screen
                                     if (navigatorKey.currentState != null) {
                                       navigatorKey.currentState!
                                           .pushReplacementNamed('/homePage');
                                     }
                                   } else {
-                                    // Show error message
                                     SnackbarUtil.showSnackbar(
-                                        "Google sign-in failed",
+                                        result ?? "Google sign-in failed",
                                         type: SnackbarType.error);
                                   }
-                                },
-                              ),
+                                } catch (e) {
+                                  SnackbarUtil.showSnackbar(e.toString(),
+                                      type: SnackbarType.error);
+                                } finally {
+                                  setState(() => _isLoading = false);
+                                }
+                              },
+                              icon: Image.asset('assets/icons/google_logo.png',
+                                  height: 24.0),
+                              label: Text(_isLoading
+                                  ? 'Signing In...'
+                                  : 'Sign in with Google'),
                             ),
-                            const SizedBox(
-                              height: 10,
-                            ),
-                            ElevatedButton(
-                              onPressed: flipCard,
-                              child: Text(isFront
-                                  ? "Switch to Sign Up"
-                                  : "Back to Log In"),
-                            ),
-                            const Spacer(),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(
+                            height: 10,
+                          ),
+                          ElevatedButton(
+                            onPressed: flipCard,
+                            child: Text(isFront
+                                ? "Switch to Sign Up"
+                                : "Back to Log In"),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ),
+              if (_isLoading)
+                Container(
+                  color: Colors.black.withOpacity(0.5),
+                  child: const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
             ],
           ),
         ),

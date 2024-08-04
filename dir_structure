@@ -1,0 +1,58 @@
+.
+├── README.md
+├── analysis_options.yaml
+├── assets
+│   ├── icons
+│   │   ├── app_icon.png
+│   │   └── google_logo.png
+│   └── images
+│       ├── Color wheel - color theory and calculator _ Canva Colors.pdf
+│       ├── app_icon.png
+│       └── logo.png
+├── devtools_options.yaml
+├── dir_structure
+├── firebase.json
+├── lib
+│   ├── di
+│   │   └── service_locator.dart
+│   ├── firebase_options.dart
+│   ├── main.dart
+│   ├── models
+│   │   └── user_model.dart
+│   ├── routes
+│   │   ├── route_generator.dart
+│   │   └── route_names.dart
+│   ├── screens
+│   │   ├── auth
+│   │   │   ├── email_verification_screen.dart
+│   │   │   ├── forms
+│   │   │   │   ├── sign_in_form.dart
+│   │   │   │   └── sign_up_form.dart
+│   │   │   ├── otp_verification_screen.dart
+│   │   │   └── sign_in_sign_up_page.dart
+│   │   ├── onboarding
+│   │   │   ├── temporary_home_page.dart
+│   │   │   └── welcome.dart
+│   │   └── user
+│   │       └── user_details_screen.dart
+│   ├── services
+│   │   ├── api_service.dart
+│   │   └── auth_notifier.dart
+│   ├── states
+│   ├── themes
+│   │   └── app_theme.dart
+│   ├── utils
+│   │   ├── country_codes.dart
+│   │   └── globals.dart
+│   └── widgets
+│       ├── custom_count_down_timer.dart
+│       ├── custom_form_card.dart
+│       ├── custom_otp_form_field.dart
+│       ├── custom_text_form_field.dart
+│       └── snackbar_util.dart
+├── pubspec.lock
+├── pubspec.yaml
+└── test
+    └── widget_test.dart
+
+19 directories, 37 files
