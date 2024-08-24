@@ -30,7 +30,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     _checkEmailVerification();
     // Periodically check email verification status
     _timer = Timer.periodic(
-        const Duration(seconds: 25), (_) => _checkEmailVerification());
+        const Duration(seconds: 30), (_) => _checkEmailVerification());
   }
 
   @override
@@ -47,23 +47,33 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     User? user = _authNotifier.currentUser;
 
     if (user != null) {
-      await user.reload();
-      if (user.emailVerified) {
-        _timer?.cancel();
-        if (mounted) {
-          setState(() {
-            _isEmailVerified = true;
-          });
-          Navigator.of(context).pushReplacementNamed(Routes.homePage);
+      try {
+        await user.reload();
+        user = _authNotifier.currentUser;
+        await Future.delayed(const Duration(seconds: 2));
+
+        if (user != null && user.emailVerified) {
+          _timer?.cancel();
+          if (mounted) {
+            setState(() {
+              _isEmailVerified = true;
+            });
+            Navigator.of(context).pushReplacementNamed(Routes.homePage);
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _isEmailVerified = false;
+            });
+          }
+          SnackbarUtil.showSnackbar(
+              "Please verify your email before logging in.",
+              type: SnackbarType.warning);
         }
-      } else {
-        if (mounted) {
-          setState(() {
-            _isEmailVerified = false;
-          });
-        }
-        SnackbarUtil.showSnackbar("Please verify your email before logging in.",
-            type: SnackbarType.warning);
+      } catch (e) {
+        SnackbarUtil.showSnackbar(
+            "Error checking email verification status: $e",
+            type: SnackbarType.error);
       }
     }
     if (mounted) setState(() => _isChecking = false);

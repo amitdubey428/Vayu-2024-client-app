@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vayu_flutter_app/di/service_locator.dart';
@@ -81,8 +82,9 @@ class MyApp extends StatelessWidget {
                     if (authNotifier.pendingRegistration != null) {
                       return OTPVerificationScreen(
                         args: OTPScreenArguments(
-                          phoneNumber:
-                              authNotifier.pendingRegistration!.mobileNumber!,
+                          phoneNumber: PhoneNumber(
+                              phoneNumber: authNotifier
+                                  .pendingRegistration!.mobileNumber),
                           isNewUser: true,
                         ),
                       );

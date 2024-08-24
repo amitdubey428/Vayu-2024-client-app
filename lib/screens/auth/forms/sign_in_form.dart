@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import 'package:vayu_flutter_app/di/service_locator.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/widgets/custom_count_down_timer.dart';
 import 'package:vayu_flutter_app/widgets/custom_text_form_field.dart';
 import 'package:vayu_flutter_app/widgets/snackbar_util.dart';
-import 'package:vayu_flutter_app/utils/country_codes.dart';
 
 class SignInForm extends StatefulWidget {
   const SignInForm({super.key});
@@ -17,8 +17,9 @@ class _SignInFormState extends State<SignInForm> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _mobileController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _otpController = TextEditingController();
+  PhoneNumber? _phoneNumber;
 
   final ValueNotifier<bool> _canSendOtp = ValueNotifier(false);
   final ValueNotifier<bool> _isOtpValid = ValueNotifier(false);
@@ -34,13 +35,10 @@ class _SignInFormState extends State<SignInForm> {
 
   bool _isLoading = false;
 
-  CountryCode _selectedCountryCode =
-      countryCodes.firstWhere((c) => c.code == "IN");
-
   @override
   void initState() {
     super.initState();
-    _mobileController.addListener(_onMobileTextChanged);
+    _phoneController.addListener(_onMobileTextChanged);
     _otpController.addListener(_onOtpTextChanged);
     _currentOtpResendTime = _otpResendTime;
   }
@@ -49,9 +47,9 @@ class _SignInFormState extends State<SignInForm> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _mobileController.dispose();
+    _phoneController.dispose();
     _otpController.dispose();
-    _mobileController.removeListener(_onMobileTextChanged);
+    _phoneController.removeListener(_onMobileTextChanged);
     _otpController.removeListener(_onOtpTextChanged);
     _canSendOtp.dispose();
     _isOtpValid.dispose();
@@ -59,7 +57,10 @@ class _SignInFormState extends State<SignInForm> {
   }
 
   void _onMobileTextChanged() {
-    _canSendOtp.value = _mobileController.text.length == 10 && !_isOtpSent;
+    _canSendOtp.value = _phoneNumber != null &&
+        _phoneNumber!.phoneNumber != null &&
+        _phoneNumber!.phoneNumber!.length > 8 &&
+        !_isOtpSent;
   }
 
   void _onOtpTextChanged() {
@@ -96,10 +97,10 @@ class _SignInFormState extends State<SignInForm> {
   }
 
   void _sendOtp() async {
-    if (_canSendOtp.value && _otpResendCount < 3) {
+    if (_canSendOtp.value && _otpResendCount < 3 && _phoneNumber != null) {
       var authNotifier = getIt<AuthNotifier>();
-      bool userExists = await authNotifier.doesUserExistByPhone(
-          '${_selectedCountryCode.dialCode}${_mobileController.text}');
+      bool userExists =
+          await authNotifier.doesUserExistByPhone(_phoneNumber!.phoneNumber!);
 
       if (!userExists) {
         SnackbarUtil.showSnackbar("User not found! Please register :)",
@@ -119,7 +120,7 @@ class _SignInFormState extends State<SignInForm> {
       _countdownKey.currentState?.resetTimer();
 
       authNotifier.verifyPhoneNumber(
-        '${_selectedCountryCode.dialCode}${_mobileController.text}',
+        _phoneNumber!,
         (verificationId) {
           setState(() {
             _verificationId = verificationId;
@@ -130,7 +131,7 @@ class _SignInFormState extends State<SignInForm> {
               type: SnackbarType.error);
           setState(() {
             _isOtpSent = false;
-            _canSendOtp.value = _mobileController.text.length == 10;
+            _canSendOtp.value = _phoneController.text.length == 10;
           });
         },
       );
@@ -196,36 +197,47 @@ class _SignInFormState extends State<SignInForm> {
   Widget _buildSignInWithOtp() {
     return Column(
       children: [
-        Row(
-          children: [
-            Flexible(
-              flex: 1, // Set a fixed width for the CountryCodePicker
-              child: CountryCodePicker(
-                initialSelection: _selectedCountryCode,
-                onChanged: (CountryCode countryCode) {
-                  setState(() {
-                    _selectedCountryCode = countryCode;
-                  });
-                },
-              ),
+        InternationalPhoneNumberInput(
+          onInputChanged: (PhoneNumber number) {
+            _phoneNumber = number;
+            _onMobileTextChanged();
+          },
+          selectorConfig: const SelectorConfig(
+            selectorType: PhoneInputSelectorType.DROPDOWN,
+          ),
+          ignoreBlank: false,
+          autoValidateMode: AutovalidateMode.onUserInteraction,
+          selectorTextStyle: const TextStyle(color: Colors.black),
+          initialValue: PhoneNumber(isoCode: 'IN'),
+          textFieldController: _phoneController,
+          formatInput: true,
+          keyboardType: const TextInputType.numberWithOptions(
+              signed: true, decimal: true),
+          inputDecoration: InputDecoration(
+            hintText: 'Phone Number',
+            hintStyle:
+                const TextStyle(color: Color.fromARGB(255, 124, 123, 123)),
+            filled: true,
+            fillColor: Colors.grey[200],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide.none,
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: CustomTextFormField(
-                controller: _mobileController,
-                labelText: 'Mobile Number',
-                hintText: 'Enter your mobile number',
-                keyboardType: TextInputType.phone,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your mobile number';
-                  }
-                  return null;
-                },
-              ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: const BorderSide(color: Colors.grey),
             ),
-          ],
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: const BorderSide(color: Colors.grey),
+            ),
+          ),
+          onSaved: (PhoneNumber number) {
+            _phoneNumber = number;
+          },
+        ),
+        const SizedBox(
+          height: 10,
         ),
         if (_isOtpSent)
           CustomTextFormField(
@@ -261,7 +273,7 @@ class _SignInFormState extends State<SignInForm> {
               SnackbarUtil.showSnackbar('You can now resend the OTP.',
                   type: SnackbarType.informative);
               setState(() {
-                _canSendOtp.value = _mobileController.text.length == 10;
+                _canSendOtp.value = _phoneController.text.length == 10;
               });
             },
             builder: (context, remaining) {
@@ -290,9 +302,85 @@ class _SignInFormState extends State<SignInForm> {
           mainAxisSize: MainAxisSize.min, // Ensure this is set
           children: [
             _isOtpMode ? _buildSignInWithOtp() : _buildSignInWithEmail(),
+            TextButton(
+              onPressed: _showForgotPasswordDialog,
+              child: Text(
+                'Forgot Password?',
+                style: TextStyle(
+                  color: Theme.of(context).primaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  void _showForgotPasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final TextEditingController emailController = TextEditingController();
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Reset Password'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                      'Enter your email to receive a password reset link.'),
+                  const SizedBox(height: 16),
+                  CustomTextFormField(
+                    controller: emailController,
+                    labelText: 'Email',
+                    hintText: 'Enter your email',
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Cancel'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                ElevatedButton(
+                  onPressed: _isLoading
+                      ? null
+                      : () => _sendPasswordResetEmail(emailController.text),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text('Send Reset Link'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _sendPasswordResetEmail(String email) async {
+    if (email.isEmpty) {
+      SnackbarUtil.showSnackbar('Please enter your email address',
+          type: SnackbarType.error);
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      var authNotifier = getIt<AuthNotifier>();
+      String result = await authNotifier.sendPasswordResetEmail(email);
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      SnackbarUtil.showSnackbar(result, type: SnackbarType.success);
+    } catch (e) {
+      SnackbarUtil.showSnackbar('An unexpected error occurred',
+          type: SnackbarType.error);
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 }

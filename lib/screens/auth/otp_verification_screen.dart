@@ -2,10 +2,11 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import 'package:vayu_flutter_app/di/service_locator.dart';
 import 'package:vayu_flutter_app/routes/route_names.dart';
+import 'package:vayu_flutter_app/screens/common/loading_screen.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
-import 'package:vayu_flutter_app/utils/country_codes.dart';
 import 'package:vayu_flutter_app/widgets/custom_otp_form_field.dart';
 import 'package:vayu_flutter_app/widgets/snackbar_util.dart';
 import 'dart:developer' as developer;
@@ -22,9 +23,10 @@ class OTPVerificationScreen extends StatefulWidget {
 class _OTPVerificationScreenState extends State<OTPVerificationScreen>
     with TickerProviderStateMixin {
   late AuthNotifier _authNotifier;
-  late CountryCode _selectedCountryCode;
   final _otpController = TextEditingController();
   final _phoneNumberController = TextEditingController();
+  PhoneNumber? _phoneNumber;
+  PhoneNumber? _newPhoneNumber;
   String? _verificationId;
   bool _isVerifying = false;
   bool _isChangingPhoneNumber = false;
@@ -37,18 +39,17 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
   final int _initialResendDelay = 30;
   final int _resendDelayIncrement = 10;
   late AnimationController _timerController;
+  bool _isChangingNumber = false;
 
   @override
   void initState() {
     super.initState();
     _authNotifier = getIt<AuthNotifier>();
-    _selectedCountryCode = countryCodes.firstWhere(
-      (code) => widget.args.phoneNumber.startsWith(code.dialCode),
-      orElse: () => countryCodes.firstWhere((code) => code.code == "IN"),
-    );
-    _currentPhoneNumber = widget.args.phoneNumber;
-    _phoneNumberController.text = _stripCountryCode(_currentPhoneNumber);
-    _startPhoneNumberVerification();
+    _phoneNumber = widget.args.phoneNumber;
+    _currentPhoneNumber = _phoneNumber!.phoneNumber ?? '';
+    _phoneNumberController.text = _phoneNumber?.parseNumber() ?? '';
+    _verificationId =
+        widget.args.verificationId ?? _authNotifier.verificationId;
     _timerController = AnimationController(
       vsync: this,
       duration: Duration(seconds: _initialResendDelay),
@@ -56,12 +57,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
     _timerController.addListener(() {
       setState(() {}); // Trigger a rebuild when the timer updates
     });
-  }
-
-  String _stripCountryCode(String phoneNumber) {
-    return phoneNumber.startsWith(_selectedCountryCode.dialCode)
-        ? phoneNumber.substring(_selectedCountryCode.dialCode.length)
-        : phoneNumber;
+    if (_verificationId == null) {
+      _startPhoneNumberVerification();
+    } else {
+      _startResendTimer();
+    }
   }
 
   @override
@@ -92,8 +92,12 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
   Future<void> _startPhoneNumberVerification() async {
     developer.log("Called _startPhoneNumberVerification");
     if (!mounted) return; // Add this check
-
-    await _authNotifier.saveOTPVerificationState(_currentPhoneNumber);
+    if (_phoneNumber == null) {
+      SnackbarUtil.showSnackbar("Invalid phone number",
+          type: SnackbarType.error);
+      return;
+    }
+    await _authNotifier.saveOTPVerificationState(_phoneNumber!);
     if (_resendAttempts >= _maxResendAttempts) {
       SnackbarUtil.showSnackbar(
           "Maximum resend attempts reached. Please try again later.",
@@ -110,7 +114,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
       developer.log("Starting phone verification for $_currentPhoneNumber",
           name: 'otp');
       _verificationId = await _authNotifier.verifyPhoneNumber(
-        _currentPhoneNumber,
+        _phoneNumber!,
         (verificationId) {
           developer.log("Verification ID received: $verificationId",
               name: 'otp');
@@ -175,8 +179,16 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
           await _authNotifier.verifyOTP(_verificationId!, _otpController.text);
 
       if (result == "success") {
-        SnackbarUtil.showSnackbar("Mobile number verified successfully.",
-            type: SnackbarType.success);
+        String? updateResult =
+            await _authNotifier.updateVerifiedPhoneNumber(_currentPhoneNumber);
+        if (updateResult == "success") {
+          SnackbarUtil.showSnackbar("Mobile number verified successfully.",
+              type: SnackbarType.success);
+        } else {
+          SnackbarUtil.showSnackbar(
+              updateResult ?? "Failed to update phone number.",
+              type: SnackbarType.error);
+        }
       } else {
         if (mounted) {
           SnackbarUtil.showSnackbar(result ?? "Failed to verify OTP.",
@@ -198,36 +210,43 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
   }
 
   Future<void> _changePhoneNumber() async {
-    if (_phoneNumberController.text.isEmpty) {
-      SnackbarUtil.showSnackbar("Please enter a new phone number.",
+    if (_newPhoneNumber == null || _newPhoneNumber!.phoneNumber == null) {
+      SnackbarUtil.showSnackbar("Please enter a valid phone number.",
           type: SnackbarType.error);
       return;
     }
 
     setState(() {
-      _isChangingPhoneNumber = true;
+      _isChangingNumber = true;
     });
 
-    String newPhoneNumber =
-        '${_selectedCountryCode.dialCode}${_phoneNumberController.text}';
-    String? result =
-        await _authNotifier.initiatePhoneNumberUpdate(newPhoneNumber);
+    try {
+      String? result = await _authNotifier
+          .initiatePhoneNumberUpdate(_newPhoneNumber!.phoneNumber!);
 
-    setState(() {
-      _isChangingPhoneNumber = false;
-    });
-
-    if (result == "OTP sent successfully") {
-      SnackbarUtil.showSnackbar("OTP sent to new number. Please verify.",
-          type: SnackbarType.success);
-      setState(() {
-        _currentPhoneNumber = newPhoneNumber;
-      });
-      _startResendTimer();
-    } else {
+      if (result == "OTP sent successfully") {
+        SnackbarUtil.showSnackbar("OTP sent to new number. Please verify.",
+            type: SnackbarType.success);
+        setState(() {
+          _currentPhoneNumber = _newPhoneNumber!.phoneNumber!;
+          _phoneNumber = _newPhoneNumber;
+          _resendAttempts = 0;
+          _isChangingPhoneNumber = false;
+        });
+        _startResendTimer();
+      } else {
+        SnackbarUtil.showSnackbar(
+            result ?? "Failed to initiate phone number update.",
+            type: SnackbarType.error);
+      }
+    } catch (e) {
       SnackbarUtil.showSnackbar(
-          result ?? "Failed to initiate phone number update.",
+          "An error occurred while updating phone number: ${e.toString()}",
           type: SnackbarType.error);
+    } finally {
+      setState(() {
+        _isChangingNumber = false;
+      });
     }
   }
 
@@ -245,123 +264,148 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
         }
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Verify Your Number'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () async {
-              await _onBackPressed();
-            },
-          ),
-        ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 40),
-                Text(
-                  'Verify Your Number',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Enter the OTP sent to $_currentPhoneNumber',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 32),
-                CustomOTPFormField(
-                  controller: _otpController,
-                  onCompleted: (String value) {
-                    _verifyOTP();
-                  },
-                  labelText: '',
-                ),
-                const SizedBox(height: 24),
-                Center(
-                  child: ElevatedButton(
-                    onPressed: _isVerifying ? null : _verifyOTP,
-                    child: _isVerifying
-                        ? const CircularProgressIndicator()
-                        : const Text('Verify OTP'),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                    child: Column(
-                  children: [
-                    _buildResendButton(),
-                    if (_resendAttempts > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Text(
-                          'Resend attempts: $_resendAttempts / $_maxResendAttempts',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context).primaryColor,
-                                  ),
-                        ),
-                      ),
-                  ],
-                )),
-                const SizedBox(height: 32),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _isChangingPhoneNumber = !_isChangingPhoneNumber;
-                    });
-                  },
-                  child: Text(
-                    'Change phone number?',
-                    style: TextStyle(
-                      color: Theme.of(context).primaryColor,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ),
-                if (_isChangingPhoneNumber) ...[
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: CountryCodePicker(
-                          initialSelection: _selectedCountryCode,
-                          onChanged: (CountryCode countryCode) {
-                            setState(() {
-                              _selectedCountryCode = countryCode;
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 3,
-                        child: TextField(
-                          controller: _phoneNumberController,
-                          decoration: const InputDecoration(
-                            hintText: 'Enter new phone number',
-                          ),
-                          keyboardType: TextInputType.phone,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed:
-                        _isChangingPhoneNumber ? _changePhoneNumber : null,
-                    child: _isChangingPhoneNumber
-                        ? const Text('Change Phone Number')
-                        : const CircularProgressIndicator(),
-                  ),
-                ],
-              ],
+          appBar: AppBar(
+            title: const Text('Verify Your Number'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () async {
+                await _onBackPressed();
+              },
             ),
           ),
-        ),
-      ),
+          body: Stack(
+            children: [
+              SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 40),
+                      Text(
+                        'Verify Your Number',
+                        style: Theme.of(context).textTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Enter the OTP sent to $_currentPhoneNumber',
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: 32),
+                      CustomOTPFormField(
+                        controller: _otpController,
+                        onCompleted: (String value) {
+                          _verifyOTP();
+                        },
+                        labelText: '',
+                      ),
+                      const SizedBox(height: 24),
+                      Center(
+                        child: ElevatedButton(
+                          onPressed: _isVerifying ? null : _verifyOTP,
+                          child: _isVerifying
+                              ? const CircularProgressIndicator()
+                              : const Text('Verify OTP'),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                          child: Column(
+                        children: [
+                          _buildResendButton(),
+                          if (_resendAttempts > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                'Resend attempts: $_resendAttempts / $_maxResendAttempts',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context).primaryColor,
+                                    ),
+                              ),
+                            ),
+                        ],
+                      )),
+                      const SizedBox(height: 32),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isChangingPhoneNumber = !_isChangingPhoneNumber;
+                          });
+                        },
+                        child: Text(
+                          'Change phone number?',
+                          style: TextStyle(
+                            color: Theme.of(context).primaryColor,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      if (_isChangingPhoneNumber) ...[
+                        const SizedBox(height: 16),
+                        InternationalPhoneNumberInput(
+                          onInputChanged: (PhoneNumber number) {
+                            setState(() {
+                              _newPhoneNumber = number;
+                            });
+                          },
+                          selectorConfig: const SelectorConfig(
+                            selectorType: PhoneInputSelectorType.DROPDOWN,
+                          ),
+                          ignoreBlank: false,
+                          autoValidateMode: AutovalidateMode.onUserInteraction,
+                          selectorTextStyle:
+                              const TextStyle(color: Colors.black),
+                          initialValue: null,
+                          textFieldController: _phoneNumberController,
+                          formatInput: true,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              signed: true, decimal: true),
+                          inputDecoration: InputDecoration(
+                            hintText: 'Enter new phone number',
+                            hintStyle: const TextStyle(
+                                color: Color.fromARGB(255, 124, 123, 123)),
+                            filled: true,
+                            fillColor: Colors.grey[200],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                              borderSide: const BorderSide(color: Colors.grey),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                              borderSide: const BorderSide(color: Colors.grey),
+                            ),
+                          ),
+                          onSaved: (PhoneNumber number) {
+                            _newPhoneNumber = number;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _newPhoneNumber != null
+                              ? _changePhoneNumber
+                              : null,
+                          child: _isChangingPhoneNumber
+                              ? const Text('Change Phone Number')
+                              : const CircularProgressIndicator(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              if (_isVerifying || _isChangingNumber)
+                const Positioned.fill(
+                  child: LoadingScreen(),
+                ),
+            ],
+          )),
     );
   }
 
@@ -441,8 +485,13 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
 }
 
 class OTPScreenArguments {
-  final String phoneNumber;
+  final PhoneNumber phoneNumber;
   final bool isNewUser;
+  final String? verificationId;
 
-  OTPScreenArguments({required this.phoneNumber, required this.isNewUser});
+  OTPScreenArguments({
+    required this.phoneNumber,
+    required this.isNewUser,
+    this.verificationId,
+  });
 }

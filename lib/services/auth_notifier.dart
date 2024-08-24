@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vayu_flutter_app/models/user_model.dart';
 import 'package:vayu_flutter_app/routes/route_names.dart';
@@ -22,17 +23,17 @@ class AuthNotifier extends ChangeNotifier {
   final ApiService _apiService;
 
   User? get currentUser => _auth.currentUser;
-  String? _phoneNumberForOtp;
-  String? get phoneNumberForOtp => _phoneNumberForOtp;
+  PhoneNumber? _phoneNumberForOtp;
+  PhoneNumber? get phoneNumberForOtp => _phoneNumberForOtp;
   UserModel? _pendingRegistration;
   UserModel? get pendingRegistration => _pendingRegistration;
-  String? _pendingPhoneNumber;
-  String? get pendingPhoneNumber => _pendingPhoneNumber;
-
+  PhoneNumber? _pendingPhoneNumber;
+  PhoneNumber? get pendingPhoneNumber => _pendingPhoneNumber;
   bool _isNewlyRegistered = false;
   bool get isNewlyRegistered => _isNewlyRegistered;
 
   String? _verificationId;
+  String? get verificationId => _verificationId;
 
   AuthNotifier(this._auth, this._prefs, this._googleSignIn, this._apiService) {
     _initPrefs();
@@ -44,10 +45,20 @@ class AuthNotifier extends ChangeNotifier {
     await syncUserData();
     // Check if there's a pending OTP verification
     bool isVerifyingOTP = await this.isVerifyingOTP();
-    String? storedPhone = await getStoredOTPVerificationPhone();
+    PhoneNumber? storedPhone = await getStoredOTPVerificationPhone();
     if (isVerifyingOTP && storedPhone != null) {
       setPhoneNumberForOtp(storedPhone);
     }
+    notifyListeners();
+  }
+
+  Future<void> clearAuthState() async {
+    _phoneNumberForOtp = null;
+    _pendingRegistration = null;
+    _pendingPhoneNumber = null;
+    _verificationId = null;
+    await clearPendingRegistration();
+    await clearOTPVerificationState();
     notifyListeners();
   }
 
@@ -57,13 +68,12 @@ class AuthNotifier extends ChangeNotifier {
       if (userExists) {
         return "Phone number is already in use";
       }
-
-      _pendingPhoneNumber = newPhoneNumber;
+      _pendingPhoneNumber = PhoneNumber(phoneNumber: newPhoneNumber);
       _verificationId = null; // Clear existing verification ID
       notifyListeners();
 
-      await verifyPhoneNumber(
-        newPhoneNumber,
+      String? verificationId = await verifyPhoneNumber(
+        PhoneNumber(phoneNumber: newPhoneNumber),
         (verificationId) {
           _verificationId = verificationId;
           notifyListeners();
@@ -71,7 +81,11 @@ class AuthNotifier extends ChangeNotifier {
         (e) => throw e,
       );
 
-      return "OTP sent successfully";
+      if (verificationId != null) {
+        return "OTP sent successfully";
+      } else {
+        return "Failed to send OTP";
+      }
     } catch (e) {
       _pendingPhoneNumber = null;
       if (e is FirebaseAuthException) {
@@ -88,6 +102,10 @@ class AuthNotifier extends ChangeNotifier {
     }
 
     try {
+      if (_pendingPhoneNumber == null ||
+          _pendingPhoneNumber!.phoneNumber == null) {
+        return "No pending phone number update";
+      }
       PhoneAuthCredential credential = PhoneAuthProvider.credential(
           verificationId: _verificationId!, smsCode: otp);
 
@@ -105,10 +123,11 @@ class AuthNotifier extends ChangeNotifier {
           lastName: "",
           email: "",
           birthDate: DateTime.now(),
-          mobileNumber: _pendingPhoneNumber);
+          mobileNumber: _pendingPhoneNumber!.phoneNumber);
       String result = await _apiService.updateUser(updatedUser, idToken);
       if (result == "success") {
-        _phoneNumberForOtp = _pendingPhoneNumber;
+        _phoneNumberForOtp =
+            PhoneNumber(phoneNumber: _pendingPhoneNumber!.phoneNumber);
         _pendingPhoneNumber = null;
         _verificationId = null;
         notifyListeners();
@@ -124,8 +143,9 @@ class AuthNotifier extends ChangeNotifier {
     }
   }
 
-  Future<void> saveOTPVerificationState(String phoneNumber) async {
-    await _prefs.setString('otp_verification_phone', phoneNumber);
+  Future<void> saveOTPVerificationState(PhoneNumber phoneNumber) async {
+    await _prefs.setString(
+        'otp_verification_phone', phoneNumber.phoneNumber ?? '');
     await _prefs.setBool('is_verifying_otp', true);
   }
 
@@ -193,7 +213,7 @@ class AuthNotifier extends ChangeNotifier {
   }
 
   /// Sets the phone number for OTP.
-  void setPhoneNumberForOtp(String? phoneNumber) {
+  void setPhoneNumberForOtp(PhoneNumber phoneNumber) {
     _phoneNumberForOtp = phoneNumber;
     notifyListeners();
   }
@@ -228,6 +248,23 @@ class AuthNotifier extends ChangeNotifier {
       String email, String password, UserModel userDetails) async {
     User? user;
     try {
+      // Validate phone number
+      bool isValidPhone = await isValidPhoneNumber(userDetails.mobileNumber!);
+      if (!isValidPhone) {
+        return "Invalid phone number. Please check and try again.";
+      }
+
+      // Check if user exists by phone number
+      bool userExists = await _apiService
+          .doesUserExistByPhone(userDetails.mobileNumber!)
+          .timeout(const Duration(seconds: 10), onTimeout: () {
+        throw TimeoutException('Backend request timed out');
+      });
+
+      if (userExists) {
+        return "User with this phone number already exists";
+      }
+
       UserCredential userCredential =
           await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -240,19 +277,23 @@ class AuthNotifier extends ChangeNotifier {
       }
 
       String? idToken = await user.getIdToken();
-      bool userExists = await _apiService
-          .doesUserExistByPhone(userDetails.mobileNumber!)
-          .timeout(const Duration(seconds: 10), onTimeout: () {
-        throw TimeoutException('Backend request timed out');
-      });
-
-      if (userExists) {
-        await user.delete();
-        return "User with this phone number already exists";
+      if (idToken == null) {
+        throw Exception("Failed to get ID token");
       }
 
-      String? result = await _sendUserDetailsToBackend(userDetails, idToken!)
-          .timeout(const Duration(seconds: 10), onTimeout: () {
+      // Create a new UserModel without the phone number
+      UserModel userWithoutPhone = UserModel(
+        uid: user.uid,
+        firstName: userDetails.firstName,
+        lastName: userDetails.lastName,
+        email: userDetails.email,
+        birthDate: userDetails.birthDate,
+        // Don't include phone number here
+      );
+
+      String? result =
+          await _sendUserDetailsToBackend(userWithoutPhone, idToken)
+              .timeout(const Duration(seconds: 10), onTimeout: () {
         throw TimeoutException('Backend request timed out');
       });
 
@@ -261,29 +302,53 @@ class AuthNotifier extends ChangeNotifier {
         return result;
       }
 
-      if (result == "success") {
-        _pendingRegistration = userDetails;
-        await _savePendingRegistration();
-        setPhoneNumberForOtp(userDetails.mobileNumber!);
-        _isNewlyRegistered = true;
-        notifyListeners();
+      _pendingRegistration = userDetails;
+      await _savePendingRegistration();
+      setPhoneNumberForOtp(PhoneNumber(phoneNumber: userDetails.mobileNumber!));
+      _isNewlyRegistered = true;
+      notifyListeners();
+
+      // Start phone verification
+      String? verificationId = await verifyPhoneNumber(
+        PhoneNumber(phoneNumber: userDetails.mobileNumber!),
+        (String vId) {
+          _verificationId = vId;
+          notifyListeners();
+        },
+        (FirebaseAuthException e) {
+          throw e;
+        },
+      );
+      if (verificationId != null) {
         navigatorKey.currentState?.pushReplacementNamed(
           Routes.otpVerification,
           arguments: OTPScreenArguments(
-            phoneNumber: userDetails.mobileNumber!,
+            phoneNumber: PhoneNumber(phoneNumber: userDetails.mobileNumber!),
             isNewUser: true,
+            verificationId: verificationId,
           ),
         );
         return "success";
+      } else {
+        return "Failed to send OTP";
       }
     } on FirebaseAuthException catch (e) {
-      await user?.delete();
+      if (user != null) {
+        await user.delete();
+      }
       return handleAuthException(e);
     } on TimeoutException {
-      await user?.delete();
+      if (user != null) {
+        await user.delete();
+      }
       return "Registration failed. Please try again.";
     } catch (e) {
-      await user?.delete();
+      if (user != null) {
+        await user.delete();
+      }
+      if (e is HttpException && e.message.contains('500')) {
+        return "Server error occurred. Please try again later.";
+      }
       developer.log("Error during registration: $e", name: 'auth', error: e);
       if (user != null) {
         String? idToken = await user.getIdToken();
@@ -293,7 +358,31 @@ class AuthNotifier extends ChangeNotifier {
       }
       return "An unexpected error occurred during registration";
     }
-    return null;
+  }
+
+  Future<String?> updateVerifiedPhoneNumber(String phoneNumber) async {
+    try {
+      User? user = _auth.currentUser;
+      if (user == null) {
+        return "User not authenticated";
+      }
+
+      String? idToken = await user.getIdToken();
+      String result = await _apiService.updateUserPhone(phoneNumber, idToken!);
+      if (result == "success") {
+        // Update local user model if needed
+        if (_pendingRegistration != null) {
+          _pendingRegistration!.mobileNumber = phoneNumber;
+          await _savePendingRegistration();
+        }
+        notifyListeners();
+        return "success";
+      } else {
+        return result;
+      }
+    } catch (e) {
+      return "An error occurred while updating phone number: ${e.toString()}";
+    }
   }
 
   void resetNewlyRegisteredFlag() {
@@ -345,11 +434,11 @@ class AuthNotifier extends ChangeNotifier {
       }
 
       await verifyPhoneNumber(
-        newPhoneNumber,
+        PhoneNumber(phoneNumber: newPhoneNumber),
         (verificationId) {
           // Handle successful sending of verification code
           _verificationId = verificationId;
-          _phoneNumberForOtp = newPhoneNumber;
+          _phoneNumberForOtp = PhoneNumber(phoneNumber: newPhoneNumber);
           notifyListeners();
         },
         (e) => throw e,
@@ -385,7 +474,7 @@ class AuthNotifier extends ChangeNotifier {
 
   /// Resets the OTP verification flag.
   void resetOtpVerificationFlag() {
-    setPhoneNumberForOtp('');
+    setPhoneNumberForOtp(PhoneNumber(phoneNumber: ''));
   }
 
   /// Signs in with email and password.
@@ -407,6 +496,21 @@ class AuthNotifier extends ChangeNotifier {
     }
   }
 
+  Future<String> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      return "If an account exists for $email, a password reset link will be sent shortly.";
+    } on FirebaseAuthException catch (e) {
+      developer.log("Firebase Auth Error: ${e.code} - ${e.message}",
+          name: 'auth');
+      return handleAuthException(e);
+    } catch (e) {
+      developer.log("Error sending password reset email: $e",
+          name: 'auth', error: e);
+      return "An unexpected error occurred while sending the password reset email";
+    }
+  }
+
   /// Logs out the current user.
   Future<void> logout() async {
     try {
@@ -423,34 +527,42 @@ class AuthNotifier extends ChangeNotifier {
 
   /// Verifies the phone number and sends an OTP.
   Future<String?> verifyPhoneNumber(
-      String phoneNumber,
+      PhoneNumber phoneNumber,
       Function(String verificationId) onCodeSent,
       Function(FirebaseAuthException e) onVerificationFailed) async {
     try {
+      Completer<String?> completer = Completer<String?>();
+
       await _auth.verifyPhoneNumber(
-        phoneNumber: phoneNumber,
+        phoneNumber: phoneNumber.phoneNumber ?? '',
         verificationCompleted: (PhoneAuthCredential credential) async {
           await _auth.signInWithCredential(credential);
           notifyListeners();
+          if (!completer.isCompleted) completer.complete(_verificationId);
         },
         verificationFailed: (FirebaseAuthException e) {
           developer.log("Phone verification failed: ${e.message}",
               name: 'auth');
           onVerificationFailed(e);
+          if (!completer.isCompleted) completer.complete(null);
         },
         codeSent: (String verificationId, int? resendToken) {
           developer.log("Verification code sent with ID: $verificationId",
               name: 'auth');
           _verificationId = verificationId;
           onCodeSent(verificationId);
+          notifyListeners();
+          if (!completer.isCompleted) completer.complete(verificationId);
         },
         codeAutoRetrievalTimeout: (String verificationId) {
           developer.log("Auto retrieval timeout", name: 'auth');
           _verificationId = verificationId;
+          notifyListeners();
+          if (!completer.isCompleted) completer.complete(verificationId);
         },
         timeout: const Duration(seconds: 60),
       );
-      return _verificationId;
+      return await completer.future;
     } catch (e) {
       developer.log("Error during phone verification: $e",
           name: 'auth', error: e);
@@ -459,6 +571,18 @@ class AuthNotifier extends ChangeNotifier {
         message: 'An unexpected error occurred during phone verification',
       ));
       return null;
+    }
+  }
+
+  Future<bool> isValidPhoneNumber(String phoneNumber) async {
+    try {
+      PhoneNumber number =
+          await PhoneNumber.getRegionInfoFromPhoneNumber(phoneNumber);
+      return number.phoneNumber != null;
+    } catch (e) {
+      developer.log("Error validating phone number: $e",
+          name: 'auth', error: e);
+      return false;
     }
   }
 
@@ -502,8 +626,9 @@ class AuthNotifier extends ChangeNotifier {
     return _prefs.getBool('is_verifying_otp') ?? false;
   }
 
-  Future<String?> getStoredOTPVerificationPhone() async {
-    return _prefs.getString('otp_verification_phone');
+  Future<PhoneNumber?> getStoredOTPVerificationPhone() async {
+    String? storedPhone = _prefs.getString('otp_verification_phone');
+    return storedPhone != null ? PhoneNumber(phoneNumber: storedPhone) : null;
   }
 
   Future<String?> verifyOTP(String verificationId, String otp) async {

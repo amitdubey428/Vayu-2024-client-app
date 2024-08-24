@@ -36,6 +36,8 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['exists'];
+      } else if (response.statusCode == 500) {
+        throw const HttpException('500');
       } else {
         throw Exception(
             'Failed to check user existence: ${response.statusCode}');
@@ -123,6 +125,27 @@ class ApiService {
     } else {
       final data = jsonDecode(response.body);
       return data['detail'] ?? "Error Updating User: ${response.statusCode}";
+    }
+  }
+
+  Future<String> updateUserPhone(String phoneNumber, String idToken) async {
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $idToken',
+    };
+    final body = jsonEncode({'phone_number': phoneNumber});
+
+    final response =
+        await put('/users/update_phone', headers: headers, body: body);
+
+    if (response.statusCode == 200) {
+      return "success";
+    } else if (response.statusCode == 404) {
+      return "User not found";
+    } else {
+      final data = jsonDecode(response.body);
+      return data['detail'] ??
+          "Error Updating User Phone: ${response.statusCode}";
     }
   }
 }
