@@ -21,6 +21,17 @@ class AppTheme {
   static final ThemeData lightTheme = ThemeData(
     primaryColor: primaryColor,
     scaffoldBackgroundColor: backgroundColor,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      iconTheme: IconThemeData(color: Colors.black),
+      titleTextStyle: TextStyle(
+          color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
+    ),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      selectedItemColor: primaryColor,
+      unselectedItemColor: Colors.grey,
+    ),
     colorScheme: const ColorScheme.light(
       primary: primaryColor,
       secondary: secondaryColor,

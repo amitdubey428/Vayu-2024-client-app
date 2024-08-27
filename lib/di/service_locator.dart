@@ -5,6 +5,7 @@ import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:vayu_flutter_app/services/trip_service.dart';
 
 final getIt = GetIt.instance;
 
@@ -14,8 +15,10 @@ Future<void> setupServiceLocator() async {
       () => SharedPreferences.getInstance());
   getIt.registerLazySingleton(() => FirebaseAuth.instance);
   getIt.registerLazySingleton(() => GoogleSignIn());
-  getIt.registerLazySingleton(
-      () => ApiService(dotenv.env['API_BASE_URL'] ?? ''));
+  getIt.registerLazySingleton(() => ApiService(
+        dotenv.env['API_BASE_URL'] ?? '',
+        getToken: () => getIt<AuthNotifier>().getRefreshedIdToken(),
+      ));
 
   // App services
   getIt.registerLazySingleton(() => AuthNotifier(
@@ -24,4 +27,6 @@ Future<void> setupServiceLocator() async {
         getIt<GoogleSignIn>(),
         getIt<ApiService>(),
       ));
+  // Register TripService
+  getIt.registerLazySingleton(() => TripService());
 }

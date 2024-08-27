@@ -7,6 +7,8 @@ class CustomTextFormField extends StatefulWidget {
   final TextInputType keyboardType;
   final String? Function(String?)? validator;
   final bool obscureText;
+  final int? maxLines;
+  final int? minLines;
 
   const CustomTextFormField({
     super.key,
@@ -16,6 +18,8 @@ class CustomTextFormField extends StatefulWidget {
     this.keyboardType = TextInputType.text,
     this.validator,
     this.obscureText = false,
+    this.maxLines = 1,
+    this.minLines,
   });
 
   @override
@@ -34,45 +38,45 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: SizedBox(
-        // height: 60,
-        child: TextFormField(
-          controller: widget.controller,
-          decoration: InputDecoration(
-            hintText: widget.labelText, // Set label text as hint text
-            hintStyle:
-                const TextStyle(color: Color.fromARGB(255, 124, 123, 123)),
-            filled: true,
-            fillColor: Colors.grey[200],
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: const BorderSide(color: Colors.grey),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: const BorderSide(color: Colors.grey),
-            ),
-            suffixIcon: widget.obscureText
-                ? IconButton(
-                    icon: Icon(
-                        _isObscured ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () {
-                      setState(() {
-                        _isObscured = !_isObscured;
-                      });
-                    },
-                  )
-                : null,
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextFormField(
+        controller: widget.controller,
+        decoration: InputDecoration(
+          labelText: widget.labelText,
+          hintText: widget.hintText,
+          hintStyle: const TextStyle(color: Color.fromARGB(255, 124, 123, 123)),
+          filled: true,
+          fillColor: Colors.grey[200],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide.none,
           ),
-          keyboardType: widget.keyboardType,
-          validator: widget.validator,
-          obscureText: _isObscured,
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: const BorderSide(color: Colors.grey),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: const BorderSide(color: Colors.grey),
+          ),
+          suffixIcon: widget.obscureText
+              ? IconButton(
+                  icon: Icon(
+                    _isObscured ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isObscured = !_isObscured;
+                    });
+                  },
+                )
+              : null,
         ),
+        keyboardType: widget.keyboardType,
+        validator: widget.validator,
+        obscureText: _isObscured,
+        maxLines: widget.obscureText ? 1 : widget.maxLines,
+        minLines: widget.minLines,
       ),
     );
   }

@@ -12,7 +12,7 @@ import 'package:vayu_flutter_app/screens/auth/email_verification_screen.dart';
 import 'package:vayu_flutter_app/screens/auth/otp_verification_screen.dart';
 import 'package:vayu_flutter_app/screens/auth/sign_in_sign_up_page.dart';
 import 'package:vayu_flutter_app/screens/common/loading_screen.dart';
-import 'package:vayu_flutter_app/screens/onboarding/temporary_home_page.dart';
+import 'package:vayu_flutter_app/screens/home/dashboard_screen.dart';
 import 'package:vayu_flutter_app/services/api_service.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/themes/app_theme.dart';
@@ -30,7 +30,10 @@ void callbackDispatcher() {
           options: DefaultFirebaseOptions.currentPlatform,
         );
         final prefs = await SharedPreferences.getInstance();
-        final apiService = ApiService(dotenv.env['API_BASE_URL'] ?? '');
+        final apiService = ApiService(
+          dotenv.env['API_BASE_URL'] ?? '',
+          getToken: () => getIt<AuthNotifier>().getRefreshedIdToken(),
+        );
         final authNotifier = AuthNotifier(
           FirebaseAuth.instance,
           prefs,
@@ -99,7 +102,7 @@ class MyApp extends StatelessWidget {
                       } else if (!authNotifier.currentUser!.emailVerified) {
                         return const EmailVerificationScreen();
                       } else {
-                        return const TemporaryHomePage();
+                        return const DashboardScreen();
                       }
                     } else {
                       return const SignInSignUpPage();

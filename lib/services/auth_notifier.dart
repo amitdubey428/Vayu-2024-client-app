@@ -464,7 +464,7 @@ class AuthNotifier extends ChangeNotifier {
     }
 
     try {
-      return await _apiService.createUser(userDetails.toMap(), idToken);
+      return await _apiService.createUser(userDetails.toMap());
     } catch (e) {
       developer.log("Error sending user details to backend: $e",
           name: 'auth', error: e);
@@ -572,6 +572,28 @@ class AuthNotifier extends ChangeNotifier {
       ));
       return null;
     }
+  }
+
+  Future<String?> getRefreshedIdToken({int retries = 3}) async {
+    User? user = _auth.currentUser;
+    if (user == null) {
+      developer.log('No current user', name: 'auth_notifier');
+      return null;
+    }
+
+    for (int i = 0; i < retries; i++) {
+      try {
+        String? token = await user.getIdToken(true);
+        return token;
+      } catch (e) {
+        developer.log("Error refreshing token (attempt ${i + 1}): $e",
+            name: 'auth', error: e);
+        if (i == retries - 1) return null;
+        await Future.delayed(
+            Duration(seconds: 2 * (i + 1))); // Exponential backoff
+      }
+    }
+    return null;
   }
 
   Future<bool> isValidPhoneNumber(String phoneNumber) async {
