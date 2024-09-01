@@ -395,7 +395,7 @@ class AuthNotifier extends ChangeNotifier {
           await _apiService.deleteUser(idToken);
         }
       }
-      return "An unexpected error occurred during registration";
+      return "Unable to complete registration. Please check your information and try again.";
     }
   }
 
@@ -535,7 +535,7 @@ class AuthNotifier extends ChangeNotifier {
       return handleAuthException(e);
     } catch (e) {
       developer.log("Error during sign in: $e", name: 'auth', error: e);
-      return "An unexpected error occurred during sign in";
+      return "Unable to sign in. Please check your email and password and try again.";
     }
   }
 

@@ -72,6 +72,9 @@ class ApiService {
               response = await httpClient.put(redirectUri,
                   headers: fullHeaders, body: body);
               break;
+            case 'DELETE':
+              response = await httpClient.delete(uri, headers: fullHeaders);
+              break;
           }
         }
       }
@@ -102,6 +105,12 @@ class ApiService {
   Future<http.Response> put(String endpoint,
       {Map<String, String>? headers, Object? body}) async {
     return _sendRequest('PUT', endpoint, headers: headers, body: body)
+        .timeout(const Duration(seconds: 30));
+  }
+
+  Future<http.Response> delete(String endpoint,
+      {Map<String, String>? headers}) async {
+    return _sendRequest('DELETE', endpoint, headers: headers)
         .timeout(const Duration(seconds: 30));
   }
 
@@ -137,7 +146,7 @@ class ApiService {
     } on TimeoutException {
       throw Exception('Connection timed out');
     } catch (e) {
-      throw Exception('An unexpected error occurred: $e');
+      throw Exception('Unable to verify phone number. Please try again later.');
     }
   }
 
