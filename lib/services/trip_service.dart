@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:vayu_flutter_app/models/trip_model.dart';
-import 'package:vayu_flutter_app/models/user_model.dart';
+import 'package:vayu_flutter_app/data/models/trip_model.dart';
+import 'package:vayu_flutter_app/data/models/user_public_info.dart';
 import 'package:vayu_flutter_app/services/api_service.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
-import 'package:vayu_flutter_app/di/service_locator.dart';
+import 'package:vayu_flutter_app/core/di/service_locator.dart';
 import 'dart:developer' as developer;
 
-import 'package:vayu_flutter_app/utils/custom_exceptions.dart';
+import 'package:vayu_flutter_app/core/utils/custom_exceptions.dart';
 
 class TripService {
   final ApiService _apiService = getIt<ApiService>();
@@ -68,7 +68,7 @@ class TripService {
   Future<TripModel> createTrip(TripModel trip) async {
     final idToken = await _getIdToken();
     try {
-      final response = await _apiService.post('/trips',
+      final response = await _apiService.post('/trips/',
           headers: {
             'Authorization': 'Bearer $idToken',
             'Content-Type': 'application/json',
@@ -90,7 +90,7 @@ class TripService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> addParticipant(
+  Future<Map<String, dynamic>> addParticipant(
       int tripId, String identifier) async {
     try {
       final idToken = await _getIdToken();
@@ -104,19 +104,115 @@ class TripService {
       );
 
       if (response.statusCode == 200) {
-        List<dynamic> resultList = json.decode(response.body);
-        return resultList.map((item) {
-          return {
-            'user': UserModel.fromMap(item['user']),
-            'status': item['status'],
-          };
-        }).toList();
+        Map<String, dynamic> result = json.decode(response.body);
+        return {
+          'added_participants': (result['added_participants'] as List)
+              .map((item) =>
+                  UserPublicInfo.fromMap(item as Map<String, dynamic>))
+              .toList(),
+          'already_in_trip': (result['already_in_trip'] as List).cast<String>(),
+        };
+      } else if (response.statusCode == 404) {
+        throw ApiException('No users found, Invite them to Vayu!');
       } else {
-        throw Exception('Failed to add participant: ${response.body}');
+        throw ApiException('Failed to add participant: ${response.body}');
       }
     } catch (e) {
-      developer.log('Error in addParticipant: $e');
-      rethrow;
+      if (e is SocketException) {
+        throw NoInternetException('No internet connection');
+      } else if (e is ApiException) {
+        rethrow;
+      } else {
+        throw ApiException('An unexpected error occurred: $e');
+      }
+    }
+  }
+
+  Future<String> generateInviteLink(int tripId) async {
+    try {
+      final response = await _apiService.post(
+        '/trips/$tripId/invite',
+        headers: {
+          'Authorization': 'Bearer ${await _getIdToken()}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final String invitationCode = data['invitation_code'];
+        return 'vayuapp://join-trip/$invitationCode';
+      } else {
+        throw ApiException('Failed to generate invite link: ${response.body}');
+      }
+    } catch (e) {
+      if (e is SocketException) {
+        throw NoInternetException('No internet connection');
+      } else if (e is ApiException) {
+        rethrow;
+      } else {
+        throw ApiException('An unexpected error occurred: $e');
+      }
+    }
+  }
+
+  Future<TripModel> joinTripByInvitation(String invitationCode) async {
+    try {
+      developer.log('Original invitation code: $invitationCode');
+
+      List<String> prefixes = ["http://", "https://", "vayuapp://"];
+      String? matchedPrefix = prefixes.firstWhere(
+        (prefix) => invitationCode.startsWith(prefix),
+        orElse: () => '',
+      );
+
+      if (matchedPrefix.isNotEmpty) {
+        if (matchedPrefix == "vayuapp://") {
+          List<String> parts = invitationCode.split('/');
+          if (parts.length >= 4 && parts[2] == "join-trip") {
+            invitationCode = parts[3];
+          }
+        } else {
+          final uri = Uri.parse(invitationCode);
+          developer.log('Path segments: ${uri.pathSegments}');
+
+          if (uri.pathSegments.length > 2 &&
+              uri.pathSegments[1] == "join-trip") {
+            invitationCode = uri.pathSegments[2];
+          }
+        }
+      }
+
+      developer.log('Processed invitation code: $invitationCode');
+
+      final response = await _apiService.post(
+        '/trips/join',
+        headers: {
+          'Authorization': 'Bearer ${await _getIdToken()}',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({'invitation_code': invitationCode}),
+      );
+
+      developer.log('Response status code: ${response.statusCode}');
+      developer.log('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonMap = json.decode(response.body);
+        return TripModel.fromJson(jsonMap);
+      } else {
+        throw ApiException('Failed to join trip: ${response.body}');
+      }
+    } on SocketException {
+      throw NoInternetException('No internet connection');
+    } on TimeoutException {
+      throw ApiException('Request timed out');
+    } catch (e) {
+      developer.log('Error in joinTripByInvitation: $e');
+      if (e is ApiException) {
+        rethrow;
+      }
+      throw ApiException('An unexpected error occurred: $e');
     }
   }
 }

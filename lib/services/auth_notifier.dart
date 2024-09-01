@@ -5,11 +5,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vayu_flutter_app/models/user_model.dart';
-import 'package:vayu_flutter_app/routes/route_names.dart';
-import 'package:vayu_flutter_app/screens/auth/otp_verification_screen.dart';
+import 'package:vayu_flutter_app/data/models/user_model.dart';
+import 'package:vayu_flutter_app/core/routes/route_names.dart';
+import 'package:vayu_flutter_app/features/auth/screens/otp_verification_screen.dart';
 import 'package:vayu_flutter_app/services/api_service.dart';
-import 'package:vayu_flutter_app/utils/globals.dart';
+import 'package:vayu_flutter_app/core/utils/globals.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:developer' as developer;
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -31,6 +31,8 @@ class AuthNotifier extends ChangeNotifier {
   PhoneNumber? get pendingPhoneNumber => _pendingPhoneNumber;
   bool _isNewlyRegistered = false;
   bool get isNewlyRegistered => _isNewlyRegistered;
+  int _lastLoginUpdateAttempts = 0;
+  static const int maxUpdateAttempts = 3;
 
   String? _verificationId;
   String? get verificationId => _verificationId;
@@ -39,15 +41,46 @@ class AuthNotifier extends ChangeNotifier {
     _initPrefs();
   }
 
+  Future<void> updateLastLogin() async {
+    if (_lastLoginUpdateAttempts >= maxUpdateAttempts) {
+      developer.log('Max attempts reached for updating last login',
+          name: 'auth');
+      return;
+    }
+
+    try {
+      await _apiService.updateLastLogin();
+      _lastLoginUpdateAttempts = 0; // Reset attempts on success
+    } catch (e) {
+      _lastLoginUpdateAttempts++;
+      developer.log(
+          'Error updating last login (Attempt $_lastLoginUpdateAttempts): $e',
+          name: 'auth');
+      if (_lastLoginUpdateAttempts < maxUpdateAttempts) {
+        // Retry after a delay
+        await Future.delayed(Duration(seconds: 2 * _lastLoginUpdateAttempts));
+        await updateLastLogin();
+      } else {
+        // Log for later analysis
+        // TODO: Implement a more robust logging mechanism (e.g., Firebase Crashlytics)
+        developer.log(
+            'Failed to update last login after $maxUpdateAttempts attempts',
+            name: 'auth');
+      }
+    }
+  }
+
   Future<void> initializeApp() async {
     await _initPrefs();
     await _loadPendingRegistration();
     await syncUserData();
-    // Check if there's a pending OTP verification
     bool isVerifyingOTP = await this.isVerifyingOTP();
     PhoneNumber? storedPhone = await getStoredOTPVerificationPhone();
     if (isVerifyingOTP && storedPhone != null) {
       setPhoneNumberForOtp(storedPhone);
+    }
+    if (_auth.currentUser != null) {
+      await updateLastLogin();
     }
     notifyListeners();
   }
@@ -276,6 +309,12 @@ class AuthNotifier extends ChangeNotifier {
         return "User creation failed";
       }
 
+      // Set the display name
+      await user.updateDisplayName(userDetails.firstName);
+
+      // You can also set other user properties here
+      await user.updatePhotoURL(null); // Set a default photo URL if needed
+
       String? idToken = await user.getIdToken();
       if (idToken == null) {
         throw Exception("Failed to get ID token");
@@ -481,13 +520,17 @@ class AuthNotifier extends ChangeNotifier {
   Future<String?> signInWithEmailPassword(String email, String password) async {
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
-      if (_auth.currentUser != null && !_auth.currentUser!.emailVerified) {
-        navigatorKey.currentState?.pushReplacementNamed('/emailVerification');
-        return "Please verify your email before logging in.";
+      if (_auth.currentUser != null) {
+        if (!_auth.currentUser!.emailVerified) {
+          navigatorKey.currentState?.pushReplacementNamed('/emailVerification');
+          return "Please verify your email before logging in.";
+        }
+        await updateLastLogin();
+        notifyListeners();
+        navigatorKey.currentState?.pushReplacementNamed('/homePage');
+        return "success";
       }
-      notifyListeners();
-      navigatorKey.currentState?.pushReplacementNamed('/homePage');
-      return "success";
+      return "Sign-in failed";
     } on FirebaseAuthException catch (e) {
       return handleAuthException(e);
     } catch (e) {
@@ -537,6 +580,7 @@ class AuthNotifier extends ChangeNotifier {
         phoneNumber: phoneNumber.phoneNumber ?? '',
         verificationCompleted: (PhoneAuthCredential credential) async {
           await _auth.signInWithCredential(credential);
+          await updateLastLogin();
           notifyListeners();
           if (!completer.isCompleted) completer.complete(_verificationId);
         },
@@ -655,8 +699,6 @@ class AuthNotifier extends ChangeNotifier {
 
   Future<String?> verifyOTP(String verificationId, String otp) async {
     try {
-      developer.log("Verifying OTP with verificationId: $verificationId",
-          name: 'auth');
       PhoneAuthCredential credential = PhoneAuthProvider.credential(
           verificationId: _verificationId!, smsCode: otp);
 
@@ -670,12 +712,15 @@ class AuthNotifier extends ChangeNotifier {
       await clearOTPVerificationState();
 
       User? user = _auth.currentUser;
-      if (user != null && !user.emailVerified) {
-        await sendEmailVerification(); // Send verification email
-        navigatorKey.currentState
-            ?.pushReplacementNamed(Routes.emailVerification);
-      } else {
-        navigatorKey.currentState?.pushReplacementNamed(Routes.homePage);
+      if (user != null) {
+        if (!user.emailVerified) {
+          await sendEmailVerification();
+          navigatorKey.currentState
+              ?.pushReplacementNamed(Routes.emailVerification);
+        } else {
+          await updateLastLogin();
+          navigatorKey.currentState?.pushReplacementNamed(Routes.homePage);
+        }
       }
 
       notifyListeners();
@@ -721,7 +766,6 @@ class AuthNotifier extends ChangeNotifier {
         UserCredential userCredential =
             await _auth.signInWithCredential(credential);
         String? token = await userCredential.user?.getIdToken();
-
         if (token == null) {
           throw Exception("Failed to get ID token");
         }
@@ -773,7 +817,7 @@ class AuthNotifier extends ChangeNotifier {
             return "Error: Unable to complete sign-in process";
           }
         }
-
+        await updateLastLogin();
         notifyListeners();
         return "success";
       }

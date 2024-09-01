@@ -4,10 +4,10 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-import 'package:vayu_flutter_app/models/user_model.dart';
+import 'package:vayu_flutter_app/data/models/user_model.dart';
 import 'dart:developer' as developer;
 
-import 'package:vayu_flutter_app/utils/custom_exceptions.dart';
+import 'package:vayu_flutter_app/core/utils/custom_exceptions.dart';
 
 class ApiService {
   final String baseUrl;
@@ -58,8 +58,21 @@ class ApiService {
         final redirectUrl = response.headers['location'];
         if (redirectUrl != null) {
           developer.log('Redirecting to: $redirectUrl', name: 'api_service');
-          return await _sendRequest(method, redirectUrl,
-              headers: fullHeaders, body: body);
+          final redirectUri = Uri.parse(redirectUrl);
+          switch (method) {
+            case 'GET':
+              response =
+                  await httpClient.get(redirectUri, headers: fullHeaders);
+              break;
+            case 'POST':
+              response = await httpClient.post(redirectUri,
+                  headers: fullHeaders, body: body);
+              break;
+            case 'PUT':
+              response = await httpClient.put(redirectUri,
+                  headers: fullHeaders, body: body);
+              break;
+          }
         }
       }
 
@@ -90,6 +103,18 @@ class ApiService {
       {Map<String, String>? headers, Object? body}) async {
     return _sendRequest('PUT', endpoint, headers: headers, body: body)
         .timeout(const Duration(seconds: 30));
+  }
+
+  Future<void> updateLastLogin() async {
+    try {
+      final response = await put('/users/update_last_login');
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update last login');
+      }
+    } catch (e) {
+      developer.log('Error updating last login: $e', name: 'updateLogin');
+      // Consider how to handle this error. Maybe retry later or log it for analytics.
+    }
   }
 
   Future<bool> doesUserExistByPhone(String phoneNumber) async {

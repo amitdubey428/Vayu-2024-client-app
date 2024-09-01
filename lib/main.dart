@@ -1,25 +1,28 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vayu_flutter_app/di/service_locator.dart';
-import 'package:vayu_flutter_app/routes/route_generator.dart';
-import 'package:vayu_flutter_app/screens/auth/email_verification_screen.dart';
-import 'package:vayu_flutter_app/screens/auth/otp_verification_screen.dart';
-import 'package:vayu_flutter_app/screens/auth/sign_in_sign_up_page.dart';
-import 'package:vayu_flutter_app/screens/common/loading_screen.dart';
-import 'package:vayu_flutter_app/screens/home/dashboard_screen.dart';
+import 'package:uni_links/uni_links.dart';
+import 'package:vayu_flutter_app/core/di/service_locator.dart';
+import 'package:vayu_flutter_app/core/routes/route_generator.dart';
+import 'package:vayu_flutter_app/features/auth/screens/email_verification_screen.dart';
+import 'package:vayu_flutter_app/features/auth/screens/otp_verification_screen.dart';
+import 'package:vayu_flutter_app/features/auth/screens/sign_in_sign_up_page.dart';
+import 'package:vayu_flutter_app/features/dashboard/screens/dashboard_screen.dart';
+import 'package:vayu_flutter_app/features/trips/screens/join_trip_screen.dart';
 import 'package:vayu_flutter_app/services/api_service.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
-import 'package:vayu_flutter_app/themes/app_theme.dart';
+import 'package:vayu_flutter_app/core/themes/app_theme.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:vayu_flutter_app/utils/globals.dart';
+import 'package:vayu_flutter_app/core/utils/globals.dart';
+import 'package:vayu_flutter_app/shared/widgets/custom_loading_indicator.dart';
 import 'package:workmanager/workmanager.dart';
 import 'firebase_options.dart';
+import 'dart:developer' as developer;
 
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
@@ -58,15 +61,56 @@ Future<void> main() async {
     await Workmanager().initialize(callbackDispatcher);
     runApp(const MyApp());
   } catch (e) {
-    if (kDebugMode) {
-      print('Firebase initialization error: $e');
-    }
+    developer.log('Firebase initialization error: $e');
     runApp(ErrorApp(e.toString()));
   }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    initUniLinks();
+  }
+
+  Future<void> initUniLinks() async {
+    try {
+      final initialLink = await getInitialLink();
+      if (initialLink != null) {
+        _handleDeepLink(Uri.parse(initialLink));
+      }
+    } on PlatformException {
+      // Handle exception
+      developer.log('Failed to get initial link.');
+    }
+
+    uriLinkStream.listen((Uri? uri) {
+      if (uri != null) {
+        _handleDeepLink(uri);
+      }
+    }, onError: (err) {
+      // Handle exception
+      developer.log('Error in uri link stream: $err');
+    });
+  }
+
+  void _handleDeepLink(Uri uri) {
+    if (uri.path.startsWith('/join-trip/')) {
+      final invitationCode = uri.pathSegments.last;
+      Navigator.of(navigatorKey.currentContext!).push(
+        MaterialPageRoute(
+          builder: (context) => JoinTripScreen(invitationCode: invitationCode),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +154,8 @@ class MyApp extends StatelessWidget {
                   },
                 );
               } else {
-                return const LoadingScreen();
+                return const CustomLoadingIndicator(
+                    message: 'Loading details...');
               }
             }),
         onGenerateRoute: RouteGenerator.generateRoute,
