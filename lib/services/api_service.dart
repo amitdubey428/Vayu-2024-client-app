@@ -4,27 +4,117 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-import 'package:vayu_flutter_app/models/user_model.dart';
+import 'package:vayu_flutter_app/data/models/user_model.dart';
+import 'dart:developer' as developer;
+
+import 'package:vayu_flutter_app/core/utils/custom_exceptions.dart';
 
 class ApiService {
   final String baseUrl;
+  final http.Client httpClient;
+  final Future<String?> Function() getToken;
 
-  ApiService(this.baseUrl);
+  ApiService(
+    this.baseUrl, {
+    http.Client? httpClient,
+    required this.getToken,
+  }) : httpClient = httpClient ?? http.Client();
 
-  Future<http.Response> get(String endpoint, {Map<String, String>? headers}) {
-    return http.get(Uri.parse('$baseUrl$endpoint'), headers: headers);
+  Future<http.Response> _sendRequest(
+    String method,
+    String endpoint, {
+    Map<String, String>? headers,
+    Object? body,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) throw AuthException("Not authenticated");
+
+      final fullHeaders = {
+        'Authorization': 'Bearer $token',
+        ...?headers,
+      };
+
+      final uri = Uri.parse('$baseUrl$endpoint');
+      http.Response response;
+
+      switch (method) {
+        case 'GET':
+          response = await httpClient.get(uri, headers: fullHeaders);
+          break;
+        case 'POST':
+          response =
+              await httpClient.post(uri, headers: fullHeaders, body: body);
+          break;
+        case 'PUT':
+          response =
+              await httpClient.put(uri, headers: fullHeaders, body: body);
+          break;
+        default:
+          throw ArgumentError('Unsupported HTTP method: $method');
+      }
+
+      if (response.statusCode == 307) {
+        final redirectUrl = response.headers['location'];
+        if (redirectUrl != null) {
+          developer.log('Redirecting to: $redirectUrl', name: 'api_service');
+          final redirectUri = Uri.parse(redirectUrl);
+          switch (method) {
+            case 'GET':
+              response =
+                  await httpClient.get(redirectUri, headers: fullHeaders);
+              break;
+            case 'POST':
+              response = await httpClient.post(redirectUri,
+                  headers: fullHeaders, body: body);
+              break;
+            case 'PUT':
+              response = await httpClient.put(redirectUri,
+                  headers: fullHeaders, body: body);
+              break;
+          }
+        }
+      }
+
+      return response;
+    } on SocketException {
+      throw NoInternetException('No internet connection');
+    } on TimeoutException {
+      throw ApiException('Request timed out');
+    } catch (e) {
+      developer.log('API Error: $e', name: 'api_service');
+      rethrow;
+    }
+  }
+
+  Future<http.Response> get(String endpoint,
+      {Map<String, String>? headers}) async {
+    return _sendRequest('GET', endpoint, headers: headers)
+        .timeout(const Duration(seconds: 30));
   }
 
   Future<http.Response> post(String endpoint,
-      {Map<String, String>? headers, Object? body}) {
-    return http.post(Uri.parse('$baseUrl$endpoint'),
-        headers: headers, body: body);
+      {Map<String, String>? headers, Object? body}) async {
+    return _sendRequest('POST', endpoint, headers: headers, body: body)
+        .timeout(const Duration(seconds: 30));
   }
 
   Future<http.Response> put(String endpoint,
-      {Map<String, String>? headers, Object? body}) {
-    return http.put(Uri.parse('$baseUrl$endpoint'),
-        headers: headers, body: body);
+      {Map<String, String>? headers, Object? body}) async {
+    return _sendRequest('PUT', endpoint, headers: headers, body: body)
+        .timeout(const Duration(seconds: 30));
+  }
+
+  Future<void> updateLastLogin() async {
+    try {
+      final response = await put('/users/update_last_login');
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update last login');
+      }
+    } catch (e) {
+      developer.log('Error updating last login: $e', name: 'updateLogin');
+      // Consider how to handle this error. Maybe retry later or log it for analytics.
+    }
   }
 
   Future<bool> doesUserExistByPhone(String phoneNumber) async {
@@ -51,11 +141,12 @@ class ApiService {
     }
   }
 
-  Future<String> createUser(
-      Map<String, dynamic> userDetails, String idToken) async {
+  Future<String> createUser(Map<String, dynamic> userDetails) async {
+    final token = await getToken();
+    if (token == null) throw Exception("Not authenticated");
     final headers = {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $idToken',
+      'Authorization': 'Bearer $token',
     };
     final body = jsonEncode(userDetails);
 
