@@ -56,6 +56,16 @@ class TripService {
     }
   }
 
+  Future<void> toggleArchiveTrip(int tripId, bool archive) async {
+    try {
+      await _tripRepository.toggleArchiveTrip(tripId, archive);
+    } catch (e) {
+      developer.log('Error in toggleArchiveTrip: $e',
+          name: 'trip_service', error: e);
+      rethrow;
+    }
+  }
+
   Future<void> leaveTrip(int tripId) async {
     try {
       await _tripRepository.leaveTrip(tripId);

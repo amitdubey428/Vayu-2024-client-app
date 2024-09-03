@@ -65,7 +65,7 @@ class TripRepository {
     try {
       final response = await _apiService.put(
         '/trips/${trip.tripId}',
-        body: json.encode(trip.toJson()),
+        body: json.encode(trip.toUpdateJson()),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -88,6 +88,22 @@ class TripRepository {
       }
     } catch (e) {
       throw ApiException('An error occurred while deleting the trip: $e');
+    }
+  }
+
+  Future<void> toggleArchiveTrip(int tripId, bool archive) async {
+    try {
+      final response = await _apiService.patch(
+        '/trips/$tripId/archive',
+        body: json.encode({'archive': archive}),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode != 200) {
+        throw ApiException('Failed to archive trip: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw ApiException('An error occurred while archiving the trip: $e');
     }
   }
 

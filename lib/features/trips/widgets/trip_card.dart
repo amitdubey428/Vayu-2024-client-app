@@ -1,13 +1,16 @@
-// lib/widgets/trip_card.dart
+// lib/features/trips/widgets/trip_card.dart
 
 import 'package:flutter/material.dart';
-import 'package:vayu_flutter_app/data/models/trip_model.dart';
 import 'package:intl/intl.dart';
+import 'package:vayu_flutter_app/data/models/trip_model.dart';
 
 class TripCard extends StatelessWidget {
   final TripModel trip;
 
-  const TripCard({super.key, required this.trip});
+  const TripCard({
+    super.key,
+    required this.trip,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -15,6 +18,7 @@ class TripCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: trip.isArchived ? Colors.grey[300] : null,
       child: InkWell(
         onTap: () {
           Navigator.of(context).pushNamed(
@@ -30,13 +34,20 @@ class TripCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                trip.tripName.toUpperCase(),
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      trip.tripName.toUpperCase(),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               Row(
@@ -60,6 +71,12 @@ class TripCard extends StatelessWidget {
                         .secondary
                         .withOpacity(0.1),
                   ),
+                  if (trip.isArchived)
+                    const Chip(
+                      label: Text('Archived'),
+                      backgroundColor: Colors.grey,
+                      labelStyle: TextStyle(color: Colors.white),
+                    ),
                   Icon(Icons.arrow_forward,
                       color: Theme.of(context).colorScheme.primary),
                 ],

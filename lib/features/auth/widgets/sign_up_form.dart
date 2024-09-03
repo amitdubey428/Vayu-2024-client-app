@@ -327,8 +327,7 @@ class _SignUpFormState extends State<SignUpForm> {
               ElevatedButton(
                 onPressed: _isLoading ? null : _registerUser,
                 child: _isLoading
-                    ? const CustomLoadingIndicator(
-                        message: 'Registering User...')
+                    ? const CircularProgressIndicator(color: Colors.white)
                     : const Text('Sign Up'),
               ),
             ],

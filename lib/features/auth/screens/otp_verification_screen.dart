@@ -394,8 +394,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
                               : null,
                           child: _isChangingPhoneNumber
                               ? const Text('Change Phone Number')
-                              : const CustomLoadingIndicator(
-                                  message: 'Loading...'),
+                              : const CircularProgressIndicator(
+                                  color: Colors.white),
                         ),
                       ],
                     ],

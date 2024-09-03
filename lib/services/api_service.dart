@@ -25,15 +25,16 @@ class ApiService {
     String endpoint, {
     Map<String, String>? headers,
     Object? body,
+    bool requiresAuth = true,
   }) async {
     try {
-      final token = await getToken();
-      if (token == null) throw AuthException("Not authenticated");
+      final Map<String, String> fullHeaders = {...?headers};
 
-      final fullHeaders = {
-        'Authorization': 'Bearer $token',
-        ...?headers,
-      };
+      if (requiresAuth) {
+        final token = await getToken();
+        if (token == null) throw AuthException("Not authenticated");
+        fullHeaders['Authorization'] = 'Bearer $token';
+      }
 
       final uri = Uri.parse('$baseUrl$endpoint');
       http.Response response;
@@ -46,9 +47,16 @@ class ApiService {
           response =
               await httpClient.post(uri, headers: fullHeaders, body: body);
           break;
+        case 'PATCH':
+          response =
+              await httpClient.patch(uri, headers: fullHeaders, body: body);
+          break;
         case 'PUT':
           response =
               await httpClient.put(uri, headers: fullHeaders, body: body);
+          break;
+        case 'DELETE':
+          response = await httpClient.delete(uri, headers: fullHeaders);
           break;
         default:
           throw ArgumentError('Unsupported HTTP method: $method');
@@ -72,6 +80,10 @@ class ApiService {
               response = await httpClient.put(redirectUri,
                   headers: fullHeaders, body: body);
               break;
+            case 'PATCH':
+              response = await httpClient.patch(redirectUri,
+                  headers: fullHeaders, body: body);
+              break;
             case 'DELETE':
               response = await httpClient.delete(uri, headers: fullHeaders);
               break;
@@ -91,8 +103,9 @@ class ApiService {
   }
 
   Future<http.Response> get(String endpoint,
-      {Map<String, String>? headers}) async {
-    return _sendRequest('GET', endpoint, headers: headers)
+      {Map<String, String>? headers, bool requiresAuth = true}) async {
+    return _sendRequest('GET', endpoint,
+            headers: headers, requiresAuth: requiresAuth)
         .timeout(const Duration(seconds: 30));
   }
 
@@ -105,6 +118,12 @@ class ApiService {
   Future<http.Response> put(String endpoint,
       {Map<String, String>? headers, Object? body}) async {
     return _sendRequest('PUT', endpoint, headers: headers, body: body)
+        .timeout(const Duration(seconds: 30));
+  }
+
+  Future<http.Response> patch(String endpoint,
+      {Map<String, String>? headers, Object? body}) async {
+    return _sendRequest('PATCH', endpoint, headers: headers, body: body)
         .timeout(const Duration(seconds: 30));
   }
 
@@ -129,8 +148,9 @@ class ApiService {
   Future<bool> doesUserExistByPhone(String phoneNumber) async {
     try {
       final encodedPhoneNumber = Uri.encodeQueryComponent(phoneNumber);
-      final response =
-          await get('/users/exists_by_phone?phone=$encodedPhoneNumber');
+      final response = await get(
+          '/users/exists_by_phone?phone=$encodedPhoneNumber',
+          requiresAuth: false);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

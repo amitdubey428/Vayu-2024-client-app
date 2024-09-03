@@ -46,7 +46,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             'Trip "${createdTrip.tripName}" created successfully!',
             type: SnackbarType.success,
           );
-          Navigator.of(context).pop(createdTrip);
+          Navigator.of(context).pop(true); // Return true to indicate success
         }
       } catch (e) {
         if (mounted) {

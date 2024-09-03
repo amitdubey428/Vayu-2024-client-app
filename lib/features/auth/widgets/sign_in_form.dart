@@ -3,7 +3,6 @@ import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import 'package:vayu_flutter_app/core/di/service_locator.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/shared/widgets/custom_count_down_timer.dart';
-import 'package:vayu_flutter_app/shared/widgets/custom_loading_indicator.dart';
 import 'package:vayu_flutter_app/shared/widgets/custom_text_form_field.dart';
 import 'package:vayu_flutter_app/shared/widgets/snackbar_util.dart';
 
@@ -184,7 +183,7 @@ class _SignInFormState extends State<SignInForm> {
         ElevatedButton(
           onPressed: _signInWithEmail,
           child: _isLoading
-              ? const CustomLoadingIndicator(message: 'Signing In..')
+              ? const CircularProgressIndicator(color: Colors.blue)
               : const Text('Log In'),
         ),
         TextButton(
@@ -352,8 +351,7 @@ class _SignInFormState extends State<SignInForm> {
                       ? null
                       : () => _sendPasswordResetEmail(emailController.text),
                   child: _isLoading
-                      ? const CustomLoadingIndicator(
-                          message: 'Sending reset link...')
+                      ? const CircularProgressIndicator(color: Colors.white)
                       : const Text('Send Reset Link'),
                 ),
               ],
