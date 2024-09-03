@@ -1,5 +1,4 @@
 // lib/models/trip_model.dart
-import 'package:intl/intl.dart';
 import 'package:vayu_flutter_app/data/models/user_public_info.dart';
 
 class TripModel {
@@ -53,14 +52,55 @@ class TripModel {
     return {
       if (tripId != null) 'trip_id': tripId,
       'trip_name': tripName,
-      'start_date': DateFormat('yyyy-MM-dd').format(startDate),
-      'end_date': DateFormat('yyyy-MM-dd').format(endDate),
+      'start_date': startDate.toIso8601String(),
+      'end_date': endDate.toIso8601String(),
       'description': description,
       'is_archived': isArchived,
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
-      'participants': participants,
+      'participants': participants.map((p) => p.toMap()).toList(),
       'participant_count': participantCount,
     };
+  }
+
+  TripModel copyWith({
+    int? tripId,
+    String? tripName,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? description,
+    bool? isArchived,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    List<UserPublicInfo>? participants,
+    int? participantCount,
+  }) {
+    return TripModel(
+      tripId: tripId ?? this.tripId,
+      tripName: tripName ?? this.tripName,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      description: description ?? this.description,
+      isArchived: isArchived ?? this.isArchived,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      participants: participants ?? this.participants,
+      participantCount: participantCount ?? this.participantCount,
+    );
+  }
+
+  Map<String, dynamic> toUpdateJson() {
+    return {
+      'trip_name': tripName,
+      'start_date': startDate.toIso8601String(),
+      'end_date': endDate.toIso8601String(),
+      'description': description,
+      'is_archived': isArchived,
+    };
+  }
+
+  bool isUserAdmin(String currentUserId) {
+    return participants.any((participant) =>
+        participant.firebaseUid == currentUserId && participant.isAdmin);
   }
 }

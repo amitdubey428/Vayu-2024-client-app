@@ -22,12 +22,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   final GlobalKey<TripOverviewState> _tripOverviewKey = GlobalKey();
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey = GlobalKey();
   final GlobalKey<AllTripsScreenState> _allTripsScreenKey = GlobalKey();
+  final ScrollController _scrollController = ScrollController();
 
   Future<void> _refreshDashboard() async {
     await _tripOverviewKey.currentState?.refreshTrips();
-    if (_currentIndex == 1) {
-      await _allTripsScreenKey.currentState?.refreshTrips();
-    }
+    await _allTripsScreenKey.currentState?.refreshTrips();
     // Add more refresh logic for other widgets if needed
   }
 
@@ -40,21 +39,26 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const VayuAppBar(),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          RefreshIndicator(
-            key: _refreshIndicatorKey,
-            onRefresh: _refreshDashboard,
-            child: DashboardContent(
+      body: RefreshIndicator(
+        key: _refreshIndicatorKey,
+        onRefresh: _refreshDashboard,
+        child: IndexedStack(
+          index: _currentIndex,
+          children: [
+            DashboardContent(
               tripOverviewKey: _tripOverviewKey,
+              scrollController: _scrollController,
             ),
-          ),
-          AllTripsScreen(key: _allTripsScreenKey),
-          const Placeholder(), // Expenses screen
-          const Placeholder(), // Chat screen
-          const Placeholder(), // Profile screen
-        ],
+            AllTripsScreen(
+              key: _allTripsScreenKey,
+              isInDashboard: true,
+              parentScrollController: _scrollController,
+            ),
+            const Placeholder(), // Expenses screen
+            const Placeholder(), // Chat screen
+            const Placeholder(), // Profile screen
+          ],
+        ),
       ),
       bottomNavigationBar: VayuBottomNavigation(
         currentIndex: _currentIndex,
@@ -66,16 +70,28 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     );
   }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 }
 
 class DashboardContent extends StatelessWidget {
   final GlobalKey<TripOverviewState> tripOverviewKey;
+  final ScrollController scrollController;
 
-  const DashboardContent({super.key, required this.tripOverviewKey});
+  const DashboardContent({
+    super.key,
+    required this.tripOverviewKey,
+    required this.scrollController,
+  });
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      controller: scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

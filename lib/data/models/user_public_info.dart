@@ -37,4 +37,19 @@ class UserPublicInfo {
       isAdmin: map['is_admin'] ?? false,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'user_id': userId,
+      'firebase_uid': firebaseUid,
+      'first_name': firstName,
+      'last_name': lastName,
+      'full_name': fullName,
+      'email': email,
+      'phone_number': phoneNumber,
+      'country': country,
+      'state': state,
+      'is_admin': isAdmin,
+    };
+  }
 }

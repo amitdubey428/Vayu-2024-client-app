@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:vayu_flutter_app/data/models/trip_model.dart';
 import 'package:vayu_flutter_app/core/routes/route_names.dart';
 import 'package:vayu_flutter_app/shared/widgets/qr_code_scanner.dart';
 
@@ -49,7 +48,7 @@ class QuickActions extends StatelessWidget {
                 () async {
                   final result =
                       await Navigator.of(context).pushNamed(Routes.createTrip);
-                  if (result != null && result is TripModel) {
+                  if (result == true) {
                     onDashboardRefreshNeeded();
                   }
                 },

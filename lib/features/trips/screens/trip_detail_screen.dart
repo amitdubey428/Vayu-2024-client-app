@@ -5,6 +5,7 @@ import 'package:vayu_flutter_app/core/di/service_locator.dart';
 import 'package:vayu_flutter_app/data/models/trip_model.dart';
 import 'package:intl/intl.dart';
 import 'package:vayu_flutter_app/data/models/user_public_info.dart';
+import 'package:vayu_flutter_app/features/trips/screens/edit_trip_screen.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/services/trip_service.dart';
 import 'package:vayu_flutter_app/shared/widgets/qr_code_generator.dart';
@@ -156,57 +157,6 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     }
   }
 
-  // Future<void> _addParticipant() async {
-  //   if (_tripData == null) return;
-
-  //   final result = await showDialog<String>(
-  //     context: context,
-  //     builder: (BuildContext context) {
-  //       return const AddParticipantDialog();
-  //     },
-  //   );
-  //   if (result != null && result.isNotEmpty) {
-  //     try {
-  //       var tripService = getIt<TripService>();
-  //       final response =
-  //           await tripService.addParticipant(_tripData!.tripId!, result);
-
-  //       setState(() {
-  //         _tripData!.participants
-  //             .addAll(response['added_participants'] as List<UserPublicInfo>);
-  //       });
-
-  //       String message = '';
-  //       if ((response['added_participants'] as List).isNotEmpty) {
-  //         message += 'Participant(s) added successfully. ';
-  //       }
-  //       if ((response['already_in_trip'] as List).isNotEmpty) {
-  //         message +=
-  //             '${(response['already_in_trip'] as List).join(', ')} already in the trip.';
-  //       }
-
-  //       if (mounted) {
-  //         SnackbarUtil.showSnackbar(message, type: SnackbarType.success);
-  //       }
-
-  //       // Refresh trip data
-  //       await _loadTripData();
-  //     } catch (e) {
-  //       if (mounted) {
-  //         String errorMessage = 'Failed to add participant';
-  //         if (e is ApiException) {
-  //           errorMessage = e.message;
-  //         } else if (e is NoInternetException) {
-  //           errorMessage = 'No internet connection';
-  //         } else if (e is AuthException) {
-  //           errorMessage = 'Authentication error';
-  //         }
-  //         SnackbarUtil.showSnackbar(errorMessage, type: SnackbarType.error);
-  //       }
-  //     }
-  //   }
-  // }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -218,6 +168,28 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         backgroundColor: Theme.of(context).colorScheme.primary,
         elevation: 0,
         centerTitle: true,
+        actions: [
+          if (_tripData != null && _isCurrentUserAdmin())
+            PopupMenuButton<String>(
+              onSelected: _handleMenuSelection,
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'edit',
+                  child: Text('Edit Trip'),
+                ),
+                PopupMenuItem<String>(
+                  value: 'archive',
+                  child: Text(_tripData!.isArchived
+                      ? 'Unarchive Trip'
+                      : 'Archive Trip'),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Text('Delete Trip'),
+                ),
+              ],
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CustomLoadingIndicator(message: 'Loading...'))
@@ -229,6 +201,21 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (_tripData!.isArchived)
+                            Container(
+                              color: Colors.grey[300],
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 8, horizontal: 16),
+                              child: Text(
+                                'Archived Trip',
+                                style: TextStyle(
+                                  color: Colors.grey[800],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
                           _buildDateHeader(_tripData!),
                           Padding(
                             padding: const EdgeInsets.all(16.0),
@@ -246,7 +233,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                         ],
                       ),
                     ),
-      floatingActionButton: _tripData == null
+      floatingActionButton: _tripData == null || _tripData!.isArchived
           ? null
           : FloatingActionButton(
               onPressed: _generateAndShareInviteLink,
@@ -255,9 +242,104 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     );
   }
 
+  bool _isCurrentUserAdmin() {
+    final currentUserId = getIt<AuthNotifier>().currentUser!.uid;
+    return _tripData!.participants.any((participant) =>
+        participant.firebaseUid == currentUserId && participant.isAdmin);
+  }
+
+  void _handleMenuSelection(String value) async {
+    switch (value) {
+      case 'edit':
+        final updatedTrip = await Navigator.push<TripModel>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EditTripScreen(trip: _tripData!),
+          ),
+        );
+        if (updatedTrip != null) {
+          _loadTripData(); // Refresh the trip data
+        }
+        break;
+      case 'archive':
+        await _toggleArchiveTrip();
+        break;
+      case 'delete':
+        _showDeleteConfirmationDialog();
+        break;
+    }
+  }
+
+  Future<void> _toggleArchiveTrip() async {
+    try {
+      await getIt<TripService>()
+          .toggleArchiveTrip(widget.tripId, !_tripData!.isArchived);
+      SnackbarUtil.showSnackbar(
+        'Trip ${_tripData!.isArchived ? 'unarchived' : 'archived'} successfully',
+        type: SnackbarType.success,
+      );
+      _loadTripData(); // Refresh the trip data
+    } catch (e) {
+      SnackbarUtil.showSnackbar(
+        'Failed to ${_tripData!.isArchived ? 'unarchive' : 'archive'} trip: ${e.toString()}',
+        type: SnackbarType.error,
+      );
+    }
+  }
+
+  void _showDeleteConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Trip'),
+          content: const Text(
+              'Are you sure you want to delete this trip? This action cannot be undone.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Delete'),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _deleteTrip();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteTrip() async {
+    try {
+      await getIt<TripService>().deleteTrip(widget.tripId);
+      if (mounted) {
+        Navigator.of(context).pop(); // Return to previous screen
+        SnackbarUtil.showSnackbar(
+          'Trip deleted successfully',
+          type: SnackbarType.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackbarUtil.showSnackbar(
+          'Failed to delete trip: $e',
+          type: SnackbarType.error,
+        );
+      }
+    }
+  }
+
   Widget _buildDateHeader(TripModel trip) {
     return Container(
-      color: Theme.of(context).colorScheme.primary,
+      color: trip.isArchived
+          ? Colors.grey[400]
+          : Theme.of(context).colorScheme.primary,
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
