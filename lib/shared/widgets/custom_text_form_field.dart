@@ -9,6 +9,9 @@ class CustomTextFormField extends StatefulWidget {
   final bool obscureText;
   final int? maxLines;
   final int? minLines;
+  final bool readOnly;
+  final Widget? prefixIcon;
+  final VoidCallback? onTap;
 
   const CustomTextFormField({
     super.key,
@@ -20,6 +23,9 @@ class CustomTextFormField extends StatefulWidget {
     this.obscureText = false,
     this.maxLines = 1,
     this.minLines,
+    this.readOnly = false,
+    this.prefixIcon,
+    this.onTap,
   });
 
   @override
@@ -71,12 +77,15 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
                   },
                 )
               : null,
+          prefixIcon: widget.prefixIcon,
         ),
         keyboardType: widget.keyboardType,
         validator: widget.validator,
         obscureText: _isObscured,
         maxLines: widget.obscureText ? 1 : widget.maxLines,
         minLines: widget.minLines,
+        readOnly: widget.readOnly,
+        onTap: widget.onTap,
       ),
     );
   }

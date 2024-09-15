@@ -1,4 +1,5 @@
 // lib/models/trip_model.dart
+import 'package:vayu_flutter_app/data/models/day_plan_model.dart';
 import 'package:vayu_flutter_app/data/models/user_public_info.dart';
 
 class TripModel {
@@ -12,6 +13,7 @@ class TripModel {
   final DateTime? updatedAt;
   List<UserPublicInfo> participants;
   final int? participantCount;
+  List<DayPlanModel> dayPlans;
 
   TripModel({
     this.tripId,
@@ -24,6 +26,7 @@ class TripModel {
     this.updatedAt,
     this.participants = const [],
     this.participantCount,
+    this.dayPlans = const [],
   });
 
   factory TripModel.fromJson(Map<String, dynamic> json) {
@@ -45,6 +48,10 @@ class TripModel {
               .toList() ??
           [],
       participantCount: json['participant_count'],
+      dayPlans: (json['day_plans'] as List<dynamic>?)
+              ?.map((e) => DayPlanModel.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 
@@ -60,6 +67,7 @@ class TripModel {
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
       'participants': participants.map((p) => p.toMap()).toList(),
       'participant_count': participantCount,
+      'day_plans': dayPlans.map((e) => e.toJson()).toList(),
     };
   }
 

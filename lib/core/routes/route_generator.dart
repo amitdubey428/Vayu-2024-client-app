@@ -5,6 +5,9 @@ import 'package:vayu_flutter_app/features/auth/screens/otp_verification_screen.d
 import 'package:vayu_flutter_app/features/auth/screens/sign_in_sign_up_page.dart';
 import 'package:vayu_flutter_app/features/dashboard/screens/dashboard_screen.dart';
 import 'package:vayu_flutter_app/features/onboarding/screens/welcome.dart';
+import 'package:vayu_flutter_app/features/trips/screens/add_edit_activity_screen.dart';
+import 'package:vayu_flutter_app/features/trips/screens/add_edit_day_plan_screen.dart';
+import 'package:vayu_flutter_app/features/trips/screens/add_edit_stay_screen.dart';
 import 'package:vayu_flutter_app/features/trips/screens/all_trips_screen.dart';
 import 'package:vayu_flutter_app/features/trips/screens/create_trip_screen.dart';
 import 'package:vayu_flutter_app/features/trips/screens/join_trip_screen.dart';
@@ -44,6 +47,30 @@ class RouteGenerator {
         return MaterialPageRoute(
           builder: (_) =>
               JoinTripScreen(invitationCode: args['invitationCode']),
+        );
+      case Routes.addEditDayPlan:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (_) => AddEditDayPlanScreen(
+            tripId: args['tripId'] as int,
+            dayPlan: args['dayPlan'],
+          ),
+        );
+
+      case Routes.addEditStay:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (_) => AddEditStayScreen(
+            stay: args['stay'],
+            date: args['date'] as DateTime,
+          ),
+        );
+      case Routes.addEditActivity:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (_) => AddEditActivityScreen(
+            activity: args?['activity'],
+          ),
         );
       default:
         return MaterialPageRoute(builder: (_) => const SignInSignUpPage());

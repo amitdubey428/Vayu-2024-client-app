@@ -2,10 +2,13 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:vayu_flutter_app/core/di/service_locator.dart';
+import 'package:vayu_flutter_app/core/routes/route_names.dart';
+import 'package:vayu_flutter_app/data/models/day_plan_model.dart';
 import 'package:vayu_flutter_app/data/models/trip_model.dart';
 import 'package:intl/intl.dart';
 import 'package:vayu_flutter_app/data/models/user_public_info.dart';
 import 'package:vayu_flutter_app/features/trips/screens/edit_trip_screen.dart';
+import 'package:vayu_flutter_app/features/trips/widgets/day_plan_card.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/services/trip_service.dart';
 import 'package:vayu_flutter_app/shared/widgets/qr_code_generator.dart';
@@ -27,6 +30,12 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   TripModel? _tripData;
   bool _isLoading = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTripData();
+  }
 
   Future<void> _generateAndShareInviteLink() async {
     if (_tripData == null) return;
@@ -133,10 +142,284 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _loadTripData();
+  Widget _buildDayPlansList() {
+    if (_tripData == null) return const SizedBox.shrink();
+
+    List<Widget> dayCards = _generateDayCards();
+    int visibleCards = 3;
+
+    return Column(
+      children: [
+        ...dayCards.take(visibleCards),
+        if (dayCards.length > visibleCards)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: ElevatedButton(
+              onPressed: () => _showAllDayPlans(dayCards),
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: Text('View all ${dayCards.length} days'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  List<Widget> _generateDayCards() {
+    int tripDuration =
+        _tripData!.endDate.difference(_tripData!.startDate).inDays + 1;
+    List<Widget> dayCards = [];
+
+    for (int i = 0; i < tripDuration; i++) {
+      DateTime currentDate = _tripData!.startDate.add(Duration(days: i));
+      DayPlanModel existingPlan = _tripData!.dayPlans.firstWhere(
+        (plan) => plan.date.isAtSameMomentAs(currentDate),
+        orElse: () => DayPlanModel(
+          dayPlanId: null,
+          tripId: _tripData!.tripId!,
+          date: currentDate,
+          activities: [],
+          stays: [],
+        ),
+      );
+
+      dayCards.add(
+        DayPlanCard(
+          dayPlan: existingPlan,
+          dayNumber: i + 1,
+          onTap: () => _showDayPlanDetails(existingPlan),
+          onEdit:
+              _isCurrentUserAdmin() ? () => _editDayPlan(existingPlan) : null,
+          isAdmin: _isCurrentUserAdmin(),
+        ),
+      );
+    }
+
+    return dayCards;
+  }
+
+  void _showAllDayPlans(List<Widget> dayCards) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  width: 40,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2.5),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'All Day Plans',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: dayCards.length,
+                    itemBuilder: (context, index) => dayCards[index],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _editDayPlan(DayPlanModel dayPlan) async {
+    if (!_isCurrentUserAdmin()) {
+      SnackbarUtil.showSnackbar('Only admins can edit day plans',
+          type: SnackbarType.warning);
+      return;
+    }
+
+    final result = await Navigator.pushNamed(
+      context,
+      Routes.addEditDayPlan,
+      arguments: {
+        'tripId': widget.tripId,
+        'dayPlan': dayPlan,
+      },
+    ) as DayPlanModel?;
+    if (result != null) {
+      await _refreshTripData();
+    }
+  }
+
+  void _showDayPlanDetails(DayPlanModel dayPlan) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DateFormat('MMMM dd, yyyy').format(dayPlan.date),
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 16),
+                    if (dayPlan.area != null && dayPlan.area!.isNotEmpty)
+                      _buildDetailItem(
+                          Icons.location_on, 'Area', dayPlan.area!),
+                    if (dayPlan.notes != null && dayPlan.notes!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _buildDetailItem(Icons.note, 'Notes', dayPlan.notes!),
+                    ],
+                    if (dayPlan.stays.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Stays',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      ...dayPlan.stays.map((stay) => _buildStayItem(stay)),
+                    ],
+                    if (dayPlan.activities.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Activities',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      ...dayPlan.activities
+                          .map((activity) => _buildActivityItem(activity)),
+                    ],
+                    const SizedBox(height: 24),
+                    if (_isCurrentUserAdmin())
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _editDayPlan(dayPlan);
+                          },
+                          child: const Text('Edit Day Plan'),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailItem(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(value),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStayItem(StayModel stay) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(stay.name,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            if (stay.address != null && stay.address!.isNotEmpty)
+              _buildDetailItem(Icons.location_on, 'Address', stay.address!),
+            _buildDetailItem(Icons.login, 'Check-in', stay.checkIn ?? 'N/A'),
+            _buildDetailItem(Icons.logout, 'Check-out', stay.checkOut ?? 'N/A'),
+            if (stay.notes != null && stay.notes!.isNotEmpty)
+              _buildDetailItem(Icons.note, 'Notes', stay.notes!),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivityItem(ActivityModel activity) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(activity.name,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            if (activity.startTime != null || activity.endTime != null)
+              _buildDetailItem(Icons.access_time, 'Time',
+                  '${activity.startTime ?? 'N/A'} - ${activity.endTime ?? 'N/A'}'),
+            if (activity.location != null)
+              _buildDetailItem(
+                  Icons.location_on, 'Location', activity.location!),
+            if (activity.description != null)
+              _buildDetailItem(
+                  Icons.description, 'Description', activity.description!),
+            if (activity.attachmentName != null)
+              TextButton.icon(
+                icon: const Icon(Icons.attachment),
+                label: Text(activity.attachmentName!),
+                onPressed: () {
+                  // TODO: Implement attachment viewing
+                },
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadTripData() async {
@@ -155,6 +438,11 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         SnackbarUtil.showSnackbar(_error!, type: SnackbarType.error);
       }
     }
+  }
+
+  Future<void> _refreshTripData() async {
+    setState(() => _isLoading = true);
+    await _loadTripData();
   }
 
   @override
@@ -191,54 +479,78 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CustomLoadingIndicator(message: 'Loading...'))
-          : _error != null
-              ? Center(child: Text(_error!))
-              : _tripData == null
-                  ? const Center(child: Text('No trip data available'))
-                  : SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (_tripData!.isArchived)
-                            Container(
-                              color: Colors.grey[300],
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 8, horizontal: 16),
-                              child: Text(
-                                'Archived Trip',
-                                style: TextStyle(
-                                  color: Colors.grey[800],
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          _buildDateHeader(_tripData!),
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildSectionTitle('Description'),
-                                Text(_tripData!.description),
-                                const SizedBox(height: 24),
-                                _buildSectionTitle('Participants'),
-                                _buildParticipantsList(_tripData!.participants),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+      body: RefreshIndicator(
+        onRefresh: _refreshTripData,
+        child: _isLoading
+            ? const Center(child: CustomLoadingIndicator(message: 'Loading...'))
+            : _error != null
+                ? Center(child: Text(_error!))
+                : _tripData == null
+                    ? const Center(child: Text('No trip data available'))
+                    : _buildTripContent(),
+      ),
       floatingActionButton: _tripData == null || _tripData!.isArchived
           ? null
           : FloatingActionButton(
               onPressed: _generateAndShareInviteLink,
               child: const Icon(Icons.person_add),
             ),
+    );
+  }
+
+  Widget _buildTripContent() {
+    return ListView(
+      children: [
+        if (_tripData!.isArchived)
+          Container(
+            color: Colors.grey[300],
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            child: Text(
+              'Archived Trip',
+              style: TextStyle(
+                color: Colors.grey[800],
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        _buildDateHeader(_tripData!),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ExpansionTile(
+                title: Text('Description',
+                    style: Theme.of(context).textTheme.titleLarge),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 8.0),
+                    child: Text(_tripData!.description),
+                  ),
+                ],
+              ),
+              ExpansionTile(
+                title: Text('Participants',
+                    style: Theme.of(context).textTheme.titleLarge),
+                children: [
+                  _buildParticipantsList(_tripData!.participants),
+                ],
+              ),
+              ExpansionTile(
+                title: Text('Day Plans',
+                    style: Theme.of(context).textTheme.titleLarge),
+                initiallyExpanded: true,
+                children: [
+                  _buildDayPlansList(),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -424,53 +736,16 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
           ),
           title: Row(
             children: [
-              Text('${participant.firstName} ${participant.lastName}'),
+              Expanded(
+                child: Text(
+                  '${participant.firstName} ${participant.lastName}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
               if (participant.isAdmin)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Admin',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
+                _buildTag('Admin', Theme.of(context).colorScheme.primary),
               if (participant.firebaseUid == currentUserId)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .secondary
-                          .withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Me',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.secondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
+                _buildTag('Me', Theme.of(context).colorScheme.secondary),
             ],
           ),
           subtitle: Text(participant.email),
@@ -484,6 +759,27 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
               : null,
         );
       },
+    );
+  }
+
+  Widget _buildTag(String text, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: color,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
     );
   }
 }

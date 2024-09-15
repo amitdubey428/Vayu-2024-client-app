@@ -1,5 +1,6 @@
 // In trip_service.dart
 
+import 'package:vayu_flutter_app/data/models/day_plan_model.dart';
 import 'package:vayu_flutter_app/data/models/trip_model.dart';
 import 'package:vayu_flutter_app/data/repositories/trip_repository.dart';
 import 'dart:developer' as developer;
@@ -101,6 +102,36 @@ class TripService {
       return await _tripRepository.joinTripByInvitation(invitationCode);
     } catch (e) {
       developer.log('Error in joinTripByInvitation: $e',
+          name: 'trip_service', error: e);
+      rethrow;
+    }
+  }
+
+  Future<List<DayPlanModel>> getTripDayPlans(int tripId) async {
+    try {
+      return await _tripRepository.getTripDayPlans(tripId);
+    } catch (e) {
+      developer.log('Error in getTripDayPlans: $e',
+          name: 'trip_service', error: e);
+      rethrow;
+    }
+  }
+
+  Future<DayPlanModel> updateOrCreateDayPlan(
+      int tripId, DayPlanModel dayPlan) async {
+    try {
+      return await _tripRepository.updateOrCreateDayPlan(tripId, dayPlan);
+    } catch (e) {
+      developer.log('[trip_service] Error in updateOrCreateDayPlan: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteDayPlan(int tripId, int dayPlanId) async {
+    try {
+      await _tripRepository.deleteDayPlan(tripId, dayPlanId);
+    } catch (e) {
+      developer.log('Error in deleteDayPlan: $e',
           name: 'trip_service', error: e);
       rethrow;
     }

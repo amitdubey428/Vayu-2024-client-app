@@ -53,56 +53,6 @@ class AllTripsScreenState extends State<AllTripsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    Widget content = FutureBuilder<List<TripModel>>(
-      future: _tripsFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-              child: CustomLoadingIndicator(message: 'Loading'));
-        } else if (snapshot.hasError) {
-          return const Center(
-              child: Text(
-                  'Some error occurred. Please check your internet connection'));
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('No trips found'));
-        }
-
-        final trips = snapshot.data!
-            .where((trip) => _showArchived ? trip.isArchived : !trip.isArchived)
-            .toList();
-        if (trips.isEmpty) {
-          return Center(
-            child:
-                Text(_showArchived ? 'No archived trips' : 'No active trips'),
-          );
-        }
-        return ListView.builder(
-          itemCount: trips.length,
-          itemBuilder: (context, index) {
-            final trip = trips[index];
-            return TripCard(trip: trip);
-          },
-        );
-      },
-    );
-
-    Widget body = RefreshIndicator(
-      onRefresh: refreshTrips,
-      child: widget.isInDashboard
-          ? SingleChildScrollView(
-              controller: widget.parentScrollController,
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height -
-                    AppBar().preferredSize.height -
-                    MediaQuery.of(context).padding.top -
-                    MediaQuery.of(context).padding.bottom,
-                child: content,
-              ),
-            )
-          : content,
-    );
-
     return Scaffold(
       appBar: widget.isInDashboard
           ? null
@@ -110,7 +60,42 @@ class AllTripsScreenState extends State<AllTripsScreen> {
               title: const Text('All Trips'),
               backgroundColor: Theme.of(context).colorScheme.primary,
             ),
-      body: body,
+      body: RefreshIndicator(
+        onRefresh: refreshTrips,
+        child: FutureBuilder<List<TripModel>>(
+          future: _tripsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                  child: CustomLoadingIndicator(message: 'Loading'));
+            } else if (snapshot.hasError) {
+              return _buildScrollableWidget(_buildErrorWidget());
+            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return _buildScrollableWidget(_buildEmptyWidget());
+            }
+
+            final trips = snapshot.data!
+                .where((trip) =>
+                    _showArchived ? trip.isArchived : !trip.isArchived)
+                .toList();
+
+            if (trips.isEmpty) {
+              return _buildScrollableWidget(_buildEmptyWidget());
+            }
+
+            return ListView.builder(
+              controller:
+                  widget.isInDashboard ? widget.parentScrollController : null,
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: trips.length,
+              itemBuilder: (context, index) {
+                final trip = trips[index];
+                return TripCard(trip: trip);
+              },
+            );
+          },
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           setState(() {
@@ -120,5 +105,37 @@ class AllTripsScreenState extends State<AllTripsScreen> {
         child: Icon(_showArchived ? Icons.archive : Icons.unarchive),
       ),
     );
+  }
+
+  Widget _buildScrollableWidget(Widget child) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(
+          height: MediaQuery.of(context).size.height,
+          child: Center(child: child),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text(
+          'Some error occurred. Please check your internet connection',
+          textAlign: TextAlign.center,
+        ),
+        ElevatedButton(
+          onPressed: refreshTrips,
+          child: const Text('Retry'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyWidget() {
+    return Text(_showArchived ? 'No archived trips' : 'No active trips');
   }
 }

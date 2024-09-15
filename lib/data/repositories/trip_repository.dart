@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'package:vayu_flutter_app/data/models/day_plan_model.dart';
 import 'package:vayu_flutter_app/data/models/trip_model.dart';
 import 'package:vayu_flutter_app/data/models/user_public_info.dart';
 import 'package:vayu_flutter_app/services/api_service.dart';
@@ -177,6 +178,54 @@ class TripRepository {
       }
     } catch (e) {
       throw ApiException('An error occurred while joining the trip: $e');
+    }
+  }
+
+  Future<List<DayPlanModel>> getTripDayPlans(int tripId) async {
+    try {
+      final response = await _apiService.get('/trips/$tripId/day-plans');
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList = json.decode(response.body);
+        return jsonList.map((json) => DayPlanModel.fromJson(json)).toList();
+      } else {
+        throw ApiException('Failed to get day plans: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw ApiException('An error occurred while fetching day plans: $e');
+    }
+  }
+
+  Future<DayPlanModel> updateOrCreateDayPlan(
+      int tripId, DayPlanModel dayPlan) async {
+    try {
+      final response = await _apiService.put(
+        '/trips/$tripId/day-plans/${dayPlan.dayPlanId ?? 'new'}',
+        body: json.encode(dayPlan.toJson()),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonMap = json.decode(response.body);
+        return DayPlanModel.fromJson(jsonMap);
+      } else {
+        throw ApiException(
+            'Failed to update/create day plan: ${response.body}');
+      }
+    } catch (e) {
+      throw ApiException(
+          'An error occurred while updating/creating day plan: $e');
+    }
+  }
+
+  Future<void> deleteDayPlan(int tripId, int dayPlanId) async {
+    try {
+      final response =
+          await _apiService.delete('/trips/$tripId/day-plans/$dayPlanId');
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw ApiException('Failed to delete day plan: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw ApiException('An error occurred while deleting day plan: $e');
     }
   }
 }

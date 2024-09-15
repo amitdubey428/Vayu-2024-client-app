@@ -268,4 +268,53 @@ class ApiService {
           "Error Updating User Phone: ${response.statusCode}";
     }
   }
+  // In api_service.dart
+
+  Future<http.Response> postWithFile(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    List<int>? file,
+    String? fileName,
+    required String token,
+  }) async {
+    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl$endpoint'));
+    request.headers['Authorization'] = 'Bearer $token';
+    request.fields
+        .addAll(body.map((key, value) => MapEntry(key, value.toString())));
+
+    if (file != null && fileName != null) {
+      request.files.add(http.MultipartFile.fromBytes(
+        'attachment',
+        file,
+        filename: fileName,
+      ));
+    }
+
+    var response = await request.send();
+    return await http.Response.fromStream(response);
+  }
+
+  Future<http.Response> putWithFile(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    List<int>? file,
+    String? fileName,
+    required String token,
+  }) async {
+    var request = http.MultipartRequest('PUT', Uri.parse('$baseUrl$endpoint'));
+    request.headers['Authorization'] = 'Bearer $token';
+    request.fields
+        .addAll(body.map((key, value) => MapEntry(key, value.toString())));
+
+    if (file != null && fileName != null) {
+      request.files.add(http.MultipartFile.fromBytes(
+        'attachment',
+        file,
+        filename: fileName,
+      ));
+    }
+
+    var response = await request.send();
+    return await http.Response.fromStream(response);
+  }
 }

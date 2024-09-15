@@ -9,4 +9,7 @@ class Routes {
   static const String allTrips = '/allTrips';
   static const String createTrip = '/createTrip';
   static const String joinTrip = '/joinTrip';
+  static const String addEditDayPlan = '/addEditDayPlan';
+  static const String addEditStay = '/addEditStay';
+  static const String addEditActivity = '/addEditActivity';
 }
