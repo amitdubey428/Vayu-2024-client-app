@@ -148,7 +148,7 @@ class _AddEditDayPlanScreenState extends State<AddEditDayPlanScreen> {
                 if (stay.address != null)
                   ListTile(
                     leading: const Icon(Icons.location_on),
-                    title: Text(stay.address!),
+                    title: Text(stay.address!.name),
                   ),
                 if (stay.notes != null)
                   ListTile(
@@ -184,6 +184,7 @@ class _AddEditDayPlanScreenState extends State<AddEditDayPlanScreen> {
       Routes.addEditStay,
       arguments: {
         'date': widget.dayPlan?.date ?? DateTime.now(),
+        'tripId': widget.tripId
       },
     ) as StayModel?;
     if (result != null) {
@@ -200,6 +201,7 @@ class _AddEditDayPlanScreenState extends State<AddEditDayPlanScreen> {
       arguments: {
         'stay': stay,
         'date': widget.dayPlan?.date ?? DateTime.now(),
+        'tripId': widget.tripId
       },
     ) as StayModel?;
     if (result != null) {
@@ -251,6 +253,7 @@ class _AddEditDayPlanScreenState extends State<AddEditDayPlanScreen> {
     final result = await Navigator.pushNamed(
       context,
       Routes.addEditActivity,
+      arguments: {'tripId': widget.tripId},
     ) as ActivityModel?;
     if (result != null) {
       setState(() {
@@ -277,7 +280,7 @@ class _AddEditDayPlanScreenState extends State<AddEditDayPlanScreen> {
                 if (activity.location != null)
                   ListTile(
                     leading: const Icon(Icons.location_on),
-                    title: Text(activity.location!),
+                    title: Text(activity.location!.name),
                   ),
                 if (activity.description != null)
                   ListTile(
@@ -315,7 +318,7 @@ class _AddEditDayPlanScreenState extends State<AddEditDayPlanScreen> {
     final result = await Navigator.pushNamed(
       context,
       Routes.addEditActivity,
-      arguments: {'activity': activity},
+      arguments: {'activity': activity, 'tripId': widget.tripId},
     ) as ActivityModel?;
     if (result != null) {
       setState(() {

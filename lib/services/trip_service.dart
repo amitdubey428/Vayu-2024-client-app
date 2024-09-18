@@ -1,9 +1,15 @@
 // In trip_service.dart
 
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:vayu_flutter_app/data/models/day_plan_model.dart';
 import 'package:vayu_flutter_app/data/models/trip_model.dart';
 import 'package:vayu_flutter_app/data/repositories/trip_repository.dart';
 import 'dart:developer' as developer;
+import 'package:http/http.dart' as http;
 
 class TripService {
   final TripRepository _tripRepository;
@@ -133,6 +139,47 @@ class TripService {
     } catch (e) {
       developer.log('Error in deleteDayPlan: $e',
           name: 'trip_service', error: e);
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchLocations(String query) async {
+    try {
+      final apiKey = Platform.isAndroid
+          ? dotenv.env['GOOGLE_MAPS_ANDROID_API_KEY']
+          : dotenv.env['GOOGLE_MAPS_IOS_API_KEY'];
+      final url =
+          'https://maps.googleapis.com/maps/api/place/textsearch/json?query=$query&key=$apiKey';
+
+      // Try to get cached response
+      try {
+        final file = await DefaultCacheManager().getSingleFile(url);
+        final cachedData = await file.readAsString();
+        final data = json.decode(cachedData);
+        return List<Map<String, dynamic>>.from(data['results']);
+      } catch (e) {
+        // If there's an error reading the cache, proceed with the API call
+        developer.log('Cache read error: $e', error: e);
+      }
+
+      // If not cached, make the API call
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        // Cache the response
+        // Try to cache the response, but don't let cache errors stop the process
+        try {
+          await DefaultCacheManager().putFile(url, response.bodyBytes);
+        } catch (cacheError) {
+          developer.log('Cache write error: $cacheError', error: cacheError);
+        }
+        return List<Map<String, dynamic>>.from(data['results']);
+      } else {
+        throw Exception('Failed to load locations: ${response.statusCode}');
+      }
+    } catch (e) {
+      developer.log('Error in searchLocations: $e', error: e);
       rethrow;
     }
   }

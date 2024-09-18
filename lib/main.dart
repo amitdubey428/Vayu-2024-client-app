@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
@@ -59,6 +60,8 @@ Future<void> main() async {
     );
     await setupServiceLocator();
     await Workmanager().initialize(callbackDispatcher);
+    await DefaultCacheManager().emptyCache();
+
     runApp(const MyApp());
   } catch (e) {
     developer.log('Firebase initialization error: $e');

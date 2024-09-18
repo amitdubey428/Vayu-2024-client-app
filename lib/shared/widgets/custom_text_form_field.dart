@@ -11,6 +11,7 @@ class CustomTextFormField extends StatefulWidget {
   final int? minLines;
   final bool readOnly;
   final Widget? prefixIcon;
+  final Widget? suffixIcon;
   final VoidCallback? onTap;
 
   const CustomTextFormField({
@@ -25,6 +26,7 @@ class CustomTextFormField extends StatefulWidget {
     this.minLines,
     this.readOnly = false,
     this.prefixIcon,
+    this.suffixIcon,
     this.onTap,
   });
 
@@ -48,37 +50,38 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
       child: TextFormField(
         controller: widget.controller,
         decoration: InputDecoration(
-          labelText: widget.labelText,
-          hintText: widget.hintText,
-          hintStyle: const TextStyle(color: Color.fromARGB(255, 124, 123, 123)),
-          filled: true,
-          fillColor: Colors.grey[200],
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: const BorderSide(color: Colors.grey),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-            borderSide: const BorderSide(color: Colors.grey),
-          ),
-          suffixIcon: widget.obscureText
-              ? IconButton(
-                  icon: Icon(
-                    _isObscured ? Icons.visibility : Icons.visibility_off,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _isObscured = !_isObscured;
-                    });
-                  },
-                )
-              : null,
-          prefixIcon: widget.prefixIcon,
-        ),
+            labelText: widget.labelText,
+            hintText: widget.hintText,
+            hintStyle:
+                const TextStyle(color: Color.fromARGB(255, 124, 123, 123)),
+            filled: true,
+            fillColor: Colors.grey[200],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: const BorderSide(color: Colors.grey),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: const BorderSide(color: Colors.grey),
+            ),
+            suffixIcon: widget.obscureText
+                ? IconButton(
+                    icon: Icon(
+                      _isObscured ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _isObscured = !_isObscured;
+                      });
+                    },
+                  )
+                : null,
+            prefixIcon: widget.prefixIcon,
+            suffix: widget.suffixIcon),
         keyboardType: widget.keyboardType,
         validator: widget.validator,
         obscureText: _isObscured,

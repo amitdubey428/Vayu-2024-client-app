@@ -11,9 +11,12 @@ import 'package:vayu_flutter_app/features/trips/screens/edit_trip_screen.dart';
 import 'package:vayu_flutter_app/features/trips/widgets/day_plan_card.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/services/trip_service.dart';
+import 'package:vayu_flutter_app/shared/utils/attachment_utils.dart';
+import 'package:vayu_flutter_app/shared/utils/location_utils.dart';
 import 'package:vayu_flutter_app/shared/widgets/qr_code_generator.dart';
 import 'package:vayu_flutter_app/shared/widgets/snackbar_util.dart';
 import 'package:vayu_flutter_app/shared/widgets/custom_loading_indicator.dart';
+import 'dart:developer' as developer;
 
 class TripDetailScreen extends StatefulWidget {
   final int tripId;
@@ -376,12 +379,14 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             Text(stay.name,
                 style:
                     const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            if (stay.address != null && stay.address!.isNotEmpty)
-              _buildDetailItem(Icons.location_on, 'Address', stay.address!),
+            if (stay.address != null)
+              _buildLocationItem(stay.address!, 'Address'),
             _buildDetailItem(Icons.login, 'Check-in', stay.checkIn ?? 'N/A'),
             _buildDetailItem(Icons.logout, 'Check-out', stay.checkOut ?? 'N/A'),
             if (stay.notes != null && stay.notes!.isNotEmpty)
               _buildDetailItem(Icons.note, 'Notes', stay.notes!),
+            if (stay.attachmentName != null)
+              _buildAttachmentItem(stay.attachmentUrl!, stay.attachmentName!),
           ],
         ),
       ),
@@ -403,22 +408,55 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
               _buildDetailItem(Icons.access_time, 'Time',
                   '${activity.startTime ?? 'N/A'} - ${activity.endTime ?? 'N/A'}'),
             if (activity.location != null)
-              _buildDetailItem(
-                  Icons.location_on, 'Location', activity.location!),
+              _buildLocationItem(activity.location!, 'Location'),
             if (activity.description != null)
               _buildDetailItem(
                   Icons.description, 'Description', activity.description!),
             if (activity.attachmentName != null)
-              TextButton.icon(
-                icon: const Icon(Icons.attachment),
-                label: Text(activity.attachmentName!),
-                onPressed: () {
-                  // TODO: Implement attachment viewing
-                },
-              ),
+              _buildAttachmentItem(
+                  activity.attachmentUrl!, activity.attachmentName!),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLocationItem(LocationData location, String label) {
+    return InkWell(
+      onTap: () => LocationUtils.openInMaps(location),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.location_on,
+                size: 20, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(location.name),
+                  Text(location.formattedAddress,
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttachmentItem(String url, String name) {
+    return ListTile(
+      leading: const Icon(Icons.attachment),
+      title: Text(name),
+      onTap: () {
+        AttachmentUtils.handleAttachment(context, url, name);
+      },
     );
   }
 
@@ -430,10 +468,12 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _error = "Failed to load trip details: $e";
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = "Failed to load trip details: $e";
+          _isLoading = false;
+        });
+      }
       if (mounted) {
         SnackbarUtil.showSnackbar(_error!, type: SnackbarType.error);
       }
@@ -700,19 +740,6 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
       ),
     );
   }

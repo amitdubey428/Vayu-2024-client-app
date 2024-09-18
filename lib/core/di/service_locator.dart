@@ -2,6 +2,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get_it/get_it.dart';
 import 'package:vayu_flutter_app/data/repositories/trip_repository.dart';
 import 'package:vayu_flutter_app/services/api_service.dart';
+import 'package:vayu_flutter_app/services/attachment_service.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -31,4 +32,5 @@ Future<void> setupServiceLocator() async {
   // Register TripService
   getIt.registerLazySingleton(() => TripRepository(getIt<ApiService>()));
   getIt.registerLazySingleton(() => TripService(getIt<TripRepository>()));
+  getIt.registerLazySingleton(() => AttachmentService());
 }

@@ -63,6 +63,7 @@ class RouteGenerator {
           builder: (_) => AddEditStayScreen(
             stay: args['stay'],
             date: args['date'] as DateTime,
+            tripId: args['tripId'],
           ),
         );
       case Routes.addEditActivity:
@@ -70,6 +71,7 @@ class RouteGenerator {
         return MaterialPageRoute(
           builder: (_) => AddEditActivityScreen(
             activity: args?['activity'],
+            tripId: args!['tripId'],
           ),
         );
       default:

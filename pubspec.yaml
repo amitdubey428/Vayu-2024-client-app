@@ -60,6 +60,11 @@ dependencies:
   google_maps_flutter: ^2.9.0
   geolocator: ^13.0.1
   firebase_storage: ^12.3.0
+  flutter_cache_manager: ^3.4.1
+  url_launcher: ^6.3.0
+  photo_view: ^0.15.0
+  path_provider: ^2.1.4
+  open_file: ^3.5.4
   
 dev_dependencies:
   flutter_test:

@@ -54,9 +54,11 @@ class ActivityModel {
   final String? description;
   final String? startTime;
   final String? endTime;
-  final String? location;
-  final String? attachmentName;
+  final String? placeId;
   final String? attachmentUrl;
+  final String? attachmentName;
+  final String? attachmentPath;
+  final LocationData? location;
 
   ActivityModel({
     this.activityId,
@@ -65,8 +67,10 @@ class ActivityModel {
     this.startTime,
     this.endTime,
     this.location,
-    this.attachmentName,
+    this.placeId,
     this.attachmentUrl,
+    this.attachmentName,
+    this.attachmentPath,
   });
 
   factory ActivityModel.fromJson(Map<String, dynamic> json) {
@@ -76,9 +80,12 @@ class ActivityModel {
       description: json['description'],
       startTime: json['start_time'],
       endTime: json['end_time'],
-      location: json['location'],
-      attachmentName: json['attachment_name'],
+      location: json['location'] != null
+          ? LocationData.fromJson(json['location'])
+          : null,
       attachmentUrl: json['attachment_url'],
+      attachmentName: json['attachment_name'],
+      attachmentPath: json['attachment_path'],
     );
   }
 
@@ -89,9 +96,10 @@ class ActivityModel {
       'description': description,
       'start_time': startTime,
       'end_time': endTime,
-      'location': location,
-      'attachment_name': attachmentName,
+      'location': location?.toJson(),
       'attachment_url': attachmentUrl,
+      'attachment_name': attachmentName,
+      'attachment_path': attachmentPath,
     };
   }
 }
@@ -99,10 +107,14 @@ class ActivityModel {
 class StayModel {
   final int? stayId;
   final String name;
-  final String? address;
+  final LocationData? address;
   final String? checkIn;
   final String? checkOut;
   final String? notes;
+  final String? placeId;
+  final String? attachmentUrl;
+  final String? attachmentName;
+  final String? attachmentPath;
 
   StayModel({
     this.stayId,
@@ -111,16 +123,25 @@ class StayModel {
     this.checkIn,
     this.checkOut,
     this.notes,
+    this.placeId,
+    this.attachmentUrl,
+    this.attachmentName,
+    this.attachmentPath,
   });
 
   factory StayModel.fromJson(Map<String, dynamic> json) {
     return StayModel(
       stayId: json['stay_id'],
       name: json['name'],
-      address: json['address'],
+      address: json['address'] != null
+          ? LocationData.fromJson(json['address'])
+          : null,
       checkIn: json['check_in'],
       checkOut: json['check_out'],
       notes: json['notes'],
+      attachmentUrl: json['attachment_url'],
+      attachmentName: json['attachment_name'],
+      attachmentPath: json['attachment_path'],
     );
   }
 
@@ -128,10 +149,45 @@ class StayModel {
     return {
       'stay_id': stayId,
       'name': name,
-      'address': address,
+      'address': address?.toJson(),
       'check_in': checkIn,
       'check_out': checkOut,
       'notes': notes,
+      'attachment_url': attachmentUrl,
+      'attachment_name': attachmentName,
+      'attachment_path': attachmentPath,
     };
   }
+}
+
+class LocationData {
+  final String? placeId;
+  final double latitude;
+  final double longitude;
+  final String formattedAddress;
+  final String name;
+
+  LocationData({
+    this.placeId,
+    required this.latitude,
+    required this.longitude,
+    required this.formattedAddress,
+    required this.name,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'place_id': placeId,
+        'latitude': latitude,
+        'longitude': longitude,
+        'formatted_address': formattedAddress,
+        'name': name,
+      };
+
+  factory LocationData.fromJson(Map<String, dynamic> json) => LocationData(
+        placeId: json['place_id'],
+        latitude: json['latitude'],
+        longitude: json['longitude'],
+        formattedAddress: json['formatted_address'],
+        name: json['name'],
+      );
 }

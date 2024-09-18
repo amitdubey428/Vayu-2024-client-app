@@ -12,7 +12,11 @@ if (localPropertiesFile.exists()) {
         localProperties.load(reader)
     }
 }
-
+def securePropertiesFile = rootProject.file("secure.properties")
+def secureProperties = new Properties()
+if (securePropertiesFile.exists()) {
+    secureProperties.load(new FileInputStream(securePropertiesFile))
+}
 def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
 if (flutterVersionCode == null) {
     flutterVersionCode = '1'
@@ -48,6 +52,7 @@ android {
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
+        manifestPlaceholders += [MAPS_API_KEY: secureProperties['MAPS_API_KEY'] ?: ""]
     }
 
     buildTypes {
