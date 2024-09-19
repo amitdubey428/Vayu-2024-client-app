@@ -12,4 +12,5 @@ class Routes {
   static const String addEditDayPlan = '/addEditDayPlan';
   static const String addEditStay = '/addEditStay';
   static const String addEditActivity = '/addEditActivity';
+  static const String profile = '/profile';
 }

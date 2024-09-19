@@ -3,7 +3,7 @@ import 'package:vayu_flutter_app/core/di/service_locator.dart';
 import 'package:vayu_flutter_app/shared/mixins/refreshable_dashboard.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/shared/widgets/app_bar.dart';
-import 'package:vayu_flutter_app/shared/widgets/bottom_navigation.dart';
+import 'package:vayu_flutter_app/features/dashboard/widgets/bottom_navigation.dart';
 import 'package:vayu_flutter_app/features/dashboard/widgets/trip_overview.dart';
 import 'package:vayu_flutter_app/features/dashboard/widgets/quick_actions.dart';
 import 'package:vayu_flutter_app/features/dashboard/widgets/recent_activity.dart';
@@ -28,6 +28,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     await _tripOverviewKey.currentState?.refreshTrips();
     await _allTripsScreenKey.currentState?.refreshTrips();
     // Add more refresh logic for other widgets if needed
+  }
+
+  void _refreshAllTripsScreen() {
+    _allTripsScreenKey.currentState?.refreshTrips();
   }
 
   @override
@@ -66,6 +70,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           setState(() {
             _currentIndex = index;
           });
+          if (index == 1) {
+            // Assuming index 1 is for the AllTripsScreen
+            _refreshAllTripsScreen();
+          }
         },
       ),
     );

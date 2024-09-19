@@ -39,8 +39,14 @@ class LocationUtils {
   }
 
   static Future<void> openInMaps(LocationData location) async {
-    final url =
-        'https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}';
+    String url;
+    if (location.placeId != null) {
+      url =
+          'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(location.name)}&query_place_id=${location.placeId}';
+    } else {
+      url =
+          'https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}';
+    }
     if (await canLaunchUrlString(url)) {
       await launchUrlString(url);
     } else {

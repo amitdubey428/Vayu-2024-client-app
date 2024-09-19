@@ -15,6 +15,10 @@
 ├── dir_structure
 ├── firebase.json
 ├── lib
+│   ├── blocs
+│   │   ├── location_search
+│   │   │   └── location_search_bloc.dart
+│   │   └── trip
 │   ├── core
 │   │   ├── di
 │   │   │   └── service_locator.dart
@@ -48,6 +52,7 @@
 │   │   │   ├── screens
 │   │   │   │   └── dashboard_screen.dart
 │   │   │   └── widgets
+│   │   │       ├── bottom_navigation.dart
 │   │   │       ├── quick_actions.dart
 │   │   │       ├── recent_activity.dart
 │   │   │       └── trip_overview.dart
@@ -67,6 +72,7 @@
 │   │   │   │   ├── location_search_dialog.dart
 │   │   │   │   └── trip_detail_screen.dart
 │   │   │   └── widgets
+│   │   │       ├── animated_expansion_tile.dart
 │   │   │       ├── day_plan_card.dart
 │   │   │       └── trip_card.dart
 │   │   └── user
@@ -82,16 +88,21 @@
 │   └── shared
 │       ├── mixins
 │       │   └── refreshable_dashboard.dart
+│       ├── utils
+│       │   ├── attachment_utils.dart
+│       │   ├── file_utils.dart
+│       │   ├── location_utils.dart
+│       │   └── time_utils.dart
 │       └── widgets
 │           ├── add_participant_dialog.dart
 │           ├── app_bar.dart
-│           ├── bottom_navigation.dart
 │           ├── custom_count_down_timer.dart
 │           ├── custom_form_card.dart
 │           ├── custom_loading_indicator.dart
 │           ├── custom_otp_form_field.dart
 │           ├── custom_text_form_field.dart
 │           ├── date_picker_form_field.dart
+│           ├── location_input_field.dart
 │           ├── qr_code_generator.dart
 │           ├── qr_code_scanner.dart
 │           └── snackbar_util.dart
@@ -101,4 +112,4 @@
 │   └── widget_test.dart
 └── update_env.sh
 
-33 directories, 69 files
+37 directories, 76 files

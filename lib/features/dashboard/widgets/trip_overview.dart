@@ -58,20 +58,27 @@ class TripOverviewState extends State<TripOverview> {
               return _buildEmptyTripCard(context);
             }
 
-            final trips = snapshot.data!;
-            trips.sort((a, b) => a.startDate.compareTo(b.startDate));
+            final allTrips = snapshot.data!;
+            final activeTrips =
+                allTrips.where((trip) => !trip.isArchived).toList();
+            final archivedTrips =
+                allTrips.where((trip) => trip.isArchived).toList();
+
+            activeTrips.sort((a, b) => a.startDate.compareTo(b.startDate));
+            archivedTrips.sort((a, b) => a.startDate.compareTo(b.startDate));
+            final displayTrips = [...activeTrips, ...archivedTrips];
 
             return SizedBox(
               height: 200,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                itemCount: trips.length > 3 ? 4 : trips.length,
+                itemCount: displayTrips.length > 3 ? 4 : displayTrips.length,
                 itemBuilder: (context, index) {
-                  if (index < 3 && index < trips.length) {
-                    final trip = trips[index];
+                  if (index < 3 && index < displayTrips.length) {
+                    final trip = displayTrips[index];
                     return _buildTripCard(context, trip);
                   } else {
-                    return _buildViewAllCard(context, trips.length - 3);
+                    return _buildViewAllCard(context, displayTrips.length - 3);
                   }
                 },
               ),
@@ -85,6 +92,9 @@ class TripOverviewState extends State<TripOverview> {
   Widget _buildErrorWidget(Object? error) {
     String errorMessage = "An unexpected error occurred. Please try again.";
     if (error is NoInternetException) {
+      errorMessage =
+          "No internet connection. Please check your network settings.";
+    } else if (error is ApiException) {
       errorMessage =
           "No internet connection. Please check your network settings.";
     } else if (error is TimeoutException) {
@@ -133,13 +143,29 @@ class TripOverviewState extends State<TripOverview> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                trip.tripName.toUpperCase(),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      trip.tripName.toUpperCase(),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                  ),
+                  if (trip.isArchived)
+                    Tooltip(
+                      message: 'Archived Trip',
+                      child: Icon(
+                        Icons.archive,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
               Row(

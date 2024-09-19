@@ -27,7 +27,7 @@ class VayuAppBar extends StatelessWidget implements PreferredSizeWidget {
           icon: Icon(Icons.person,
               color: Theme.of(context).colorScheme.onPrimary),
           onPressed: () {
-            // TODO: Navigate to profile
+            Navigator.pushNamed(context, Routes.profile);
           },
         ),
       ],

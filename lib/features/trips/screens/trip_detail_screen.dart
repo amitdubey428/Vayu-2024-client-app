@@ -8,6 +8,7 @@ import 'package:vayu_flutter_app/data/models/trip_model.dart';
 import 'package:intl/intl.dart';
 import 'package:vayu_flutter_app/data/models/user_public_info.dart';
 import 'package:vayu_flutter_app/features/trips/screens/edit_trip_screen.dart';
+import 'package:vayu_flutter_app/features/trips/widgets/animated_expansion_tile.dart';
 import 'package:vayu_flutter_app/features/trips/widgets/day_plan_card.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/services/trip_service.dart';
@@ -16,7 +17,6 @@ import 'package:vayu_flutter_app/shared/utils/location_utils.dart';
 import 'package:vayu_flutter_app/shared/widgets/qr_code_generator.dart';
 import 'package:vayu_flutter_app/shared/widgets/snackbar_util.dart';
 import 'package:vayu_flutter_app/shared/widgets/custom_loading_indicator.dart';
-import 'dart:developer' as developer;
 
 class TripDetailScreen extends StatefulWidget {
   final int tripId;
@@ -539,61 +539,66 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   }
 
   Widget _buildTripContent() {
-    return ListView(
-      children: [
-        if (_tripData!.isArchived)
-          Container(
-            color: Colors.grey[300],
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            child: Text(
-              'Archived Trip',
-              style: TextStyle(
-                color: Colors.grey[800],
-                fontWeight: FontWeight.bold,
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_tripData!.isArchived)
+            Container(
+              color: Colors.grey[300],
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              child: Text(
+                'Archived Trip',
+                style: TextStyle(
+                  color: Colors.grey[800],
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
+            ),
+          _buildDateHeader(_tripData!),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnimatedExpansionTile(
+                  title: 'Description',
+                  icon: Icons.description,
+                  backgroundColor: Colors.blue[50],
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text(_tripData!.description),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                AnimatedExpansionTile(
+                  title: 'Participants',
+                  icon: Icons.people,
+                  backgroundColor: Colors.green[50],
+                  children: [
+                    _buildParticipantsList(_tripData!.participants),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                AnimatedExpansionTile(
+                  title: 'Day Plans',
+                  icon: Icons.calendar_today,
+                  backgroundColor: Colors.orange[50],
+                  children: [
+                    _buildDayPlansList(),
+                  ],
+                ),
+              ],
             ),
           ),
-        _buildDateHeader(_tripData!),
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ExpansionTile(
-                title: Text('Description',
-                    style: Theme.of(context).textTheme.titleLarge),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 8.0),
-                    child: Text(_tripData!.description),
-                  ),
-                ],
-              ),
-              ExpansionTile(
-                title: Text('Participants',
-                    style: Theme.of(context).textTheme.titleLarge),
-                children: [
-                  _buildParticipantsList(_tripData!.participants),
-                ],
-              ),
-              ExpansionTile(
-                title: Text('Day Plans',
-                    style: Theme.of(context).textTheme.titleLarge),
-                initiallyExpanded: true,
-                children: [
-                  _buildDayPlansList(),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
-
   bool _isCurrentUserAdmin() {
     final currentUserId = getIt<AuthNotifier>().currentUser!.uid;
     return _tripData!.participants.any((participant) =>
