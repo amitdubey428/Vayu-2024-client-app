@@ -17,6 +17,7 @@ import 'package:vayu_flutter_app/shared/utils/location_utils.dart';
 import 'package:vayu_flutter_app/shared/widgets/qr_code_generator.dart';
 import 'package:vayu_flutter_app/shared/widgets/snackbar_util.dart';
 import 'package:vayu_flutter_app/shared/widgets/custom_loading_indicator.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class TripDetailScreen extends StatefulWidget {
   final int tripId;
@@ -599,6 +600,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       ),
     );
   }
+
   bool _isCurrentUserAdmin() {
     final currentUserId = getIt<AuthNotifier>().currentUser!.uid;
     return _tripData!.participants.any((participant) =>
@@ -761,16 +763,16 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         return ListTile(
           leading: CircleAvatar(
             backgroundColor: Theme.of(context).colorScheme.secondary,
-            child: Text(
-              participant.firstName[0] + participant.lastName[0],
-              style: const TextStyle(color: Colors.white),
-            ),
+            child: _getAvatarContent(participant),
           ),
           title: Row(
             children: [
               Expanded(
                 child: Text(
-                  '${participant.firstName} ${participant.lastName}',
+                  (participant.fullName?.isNotEmpty ?? false)
+                      ? participant.fullName!
+                      : participant
+                          .phoneNumber, // Show phone number if name is empty
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -780,18 +782,42 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 _buildTag('Me', Theme.of(context).colorScheme.secondary),
             ],
           ),
-          subtitle: Text(participant.email),
-          trailing: participant.phoneNumber != null
-              ? IconButton(
-                  icon: const Icon(Icons.phone),
-                  onPressed: () {
-                    // TODO: Implement call functionality
-                  },
-                )
-              : null,
+          subtitle: Text(participant.email ?? ""),
+          trailing: IconButton(
+            icon: const Icon(Icons.phone),
+            onPressed: () async {
+              final Uri phoneUri =
+                  Uri(scheme: 'tel', path: participant.phoneNumber);
+              if (await canLaunchUrl(phoneUri)) {
+                await launchUrl(phoneUri);
+              } else {
+                SnackbarUtil.showSnackbar("Could not launch phone call",
+                    type: SnackbarType.error);
+              }
+            },
+          ),
         );
       },
     );
+  }
+
+  Widget _getAvatarContent(UserPublicInfo participant) {
+    if (participant.fullName != null && participant.fullName!.isNotEmpty) {
+      final nameParts = participant.fullName!.split(' ');
+      if (nameParts.length > 1) {
+        return Text(
+          '${nameParts.first[0]}${nameParts.last[0]}',
+          style: const TextStyle(color: Colors.white),
+        );
+      } else {
+        return Text(
+          participant.fullName![0],
+          style: const TextStyle(color: Colors.white),
+        );
+      }
+    } else {
+      return const Icon(Icons.person, color: Colors.white);
+    }
   }
 
   Widget _buildTag(String text, Color color) {

@@ -1,11 +1,9 @@
 class UserPublicInfo {
   final int userId;
   final String firebaseUid;
-  final String firstName;
-  final String lastName;
-  final String fullName;
-  final String email;
-  final String? phoneNumber;
+  final String? fullName;
+  final String? email;
+  final String phoneNumber;
   final String? country;
   final String? state;
   final bool isAdmin;
@@ -13,11 +11,9 @@ class UserPublicInfo {
   UserPublicInfo({
     required this.userId,
     required this.firebaseUid,
-    required this.firstName,
-    required this.lastName,
-    required this.fullName,
-    required this.email,
-    this.phoneNumber,
+    this.fullName,
+    this.email,
+    required this.phoneNumber,
     this.country,
     this.state,
     this.isAdmin = false,
@@ -27,13 +23,11 @@ class UserPublicInfo {
     return UserPublicInfo(
       userId: map['user_id'],
       firebaseUid: map['firebase_uid'],
-      firstName: map['first_name'],
-      lastName: map['last_name'],
-      fullName: map['full_name'],
-      email: map['email'],
+      fullName: map['full_name'] as String?,
+      email: map['email'] as String?,
       phoneNumber: map['phone_number'],
-      country: map['country'],
-      state: map['state'],
+      country: map['country'] as String?,
+      state: map['state'] as String?,
       isAdmin: map['is_admin'] ?? false,
     );
   }
@@ -42,8 +36,6 @@ class UserPublicInfo {
     return {
       'user_id': userId,
       'firebase_uid': firebaseUid,
-      'first_name': firstName,
-      'last_name': lastName,
       'full_name': fullName,
       'email': email,
       'phone_number': phoneNumber,

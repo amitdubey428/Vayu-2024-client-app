@@ -118,7 +118,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       resizeToAvoidBottomInset: true,
       body: DecoratedBox(
         decoration: const BoxDecoration(
-          color: AppTheme.backgroundColor,
+          color: AppTheme.secondaryColor,
         ),
         child: Stack(
           children: [

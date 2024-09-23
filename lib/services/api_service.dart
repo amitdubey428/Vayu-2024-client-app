@@ -28,7 +28,10 @@ class ApiService {
     bool requiresAuth = true,
   }) async {
     try {
-      final Map<String, String> fullHeaders = {...?headers};
+      final Map<String, String> fullHeaders = {
+        'Content-Type': 'application/json',
+        ...?headers
+      };
 
       if (requiresAuth) {
         final token = await getToken();
@@ -38,28 +41,50 @@ class ApiService {
 
       final uri = Uri.parse('$baseUrl$endpoint');
       http.Response response;
+      final jsonBody = body is String ? body : json.encode(body);
+      // Handle PUT requests specially
+      if (method == 'PUT') {
+        dynamic jsonBody;
 
-      switch (method) {
-        case 'GET':
-          response = await httpClient.get(uri, headers: fullHeaders);
-          break;
-        case 'POST':
-          response =
-              await httpClient.post(uri, headers: fullHeaders, body: body);
-          break;
-        case 'PATCH':
-          response =
-              await httpClient.patch(uri, headers: fullHeaders, body: body);
-          break;
-        case 'PUT':
-          response =
-              await httpClient.put(uri, headers: fullHeaders, body: body);
-          break;
-        case 'DELETE':
-          response = await httpClient.delete(uri, headers: fullHeaders);
-          break;
-        default:
-          throw ArgumentError('Unsupported HTTP method: $method');
+        if (body is String) {
+          // If body is already a JSON string, use it as is
+          jsonBody = body;
+        } else if (body is Map) {
+          // If body is a Map, remove null values and encode to JSON
+          jsonBody = json.encode(Map.fromEntries((body as Map<String, dynamic>)
+              .entries
+              .where((entry) => entry.value != null)));
+        } else {
+          // For other types, encode as is
+          jsonBody = json.encode(body);
+        }
+
+        fullHeaders['Content-Type'] = 'application/json';
+        response =
+            await httpClient.put(uri, headers: fullHeaders, body: jsonBody);
+      } else {
+        switch (method) {
+          case 'GET':
+            response = await httpClient.get(uri, headers: fullHeaders);
+            break;
+          case 'POST':
+            response = await httpClient.post(uri,
+                headers: fullHeaders, body: jsonBody);
+            break;
+          case 'PATCH':
+            response = await httpClient.patch(uri,
+                headers: fullHeaders, body: jsonBody);
+            break;
+          case 'PUT':
+            response =
+                await httpClient.put(uri, headers: fullHeaders, body: body);
+            break;
+          case 'DELETE':
+            response = await httpClient.delete(uri, headers: fullHeaders);
+            break;
+          default:
+            throw ArgumentError('Unsupported HTTP method: $method');
+        }
       }
 
       if (response.statusCode == 307) {
@@ -98,6 +123,9 @@ class ApiService {
       throw ApiException('Request timed out');
     } catch (e) {
       developer.log('API Error: $e', name: 'api_service');
+      developer.log('Request body: $body');
+      developer.log('Stack trace: ${StackTrace.current}');
+
       rethrow;
     }
   }
@@ -178,6 +206,7 @@ class ApiService {
       'Authorization': 'Bearer $token',
     };
     final body = jsonEncode(userDetails);
+    developer.log('Creating user with details: $userDetails');
 
     final response =
         await post('/users/create_user', headers: headers, body: body);
@@ -186,6 +215,8 @@ class ApiService {
       return "success";
     } else {
       final data = jsonDecode(response.body);
+      developer.log(
+          'Failed to create user: ${response.statusCode}, ${response.body}');
       return data['detail'] ?? "Error Creating User: ${response.statusCode}";
     }
   }
