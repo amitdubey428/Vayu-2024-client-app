@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class CustomTextFormField extends StatefulWidget {
   final TextEditingController controller;
@@ -13,6 +14,9 @@ class CustomTextFormField extends StatefulWidget {
   final Widget? prefixIcon;
   final Widget? suffixIcon;
   final VoidCallback? onTap;
+  final TextStyle? style;
+  final void Function(String)? onChanged;
+  final List<TextInputFormatter>? inputFormatters;
 
   const CustomTextFormField({
     super.key,
@@ -28,6 +32,9 @@ class CustomTextFormField extends StatefulWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.onTap,
+    this.style,
+    this.onChanged,
+    this.inputFormatters,
   });
 
   @override
@@ -45,43 +52,54 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextFormField(
+        inputFormatters: widget.inputFormatters,
+        onChanged: widget.onChanged,
         controller: widget.controller,
+        style: widget.style ??
+            theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface,
+            ),
         decoration: InputDecoration(
-            labelText: widget.labelText,
-            hintText: widget.hintText,
-            hintStyle:
-                const TextStyle(color: Color.fromARGB(255, 124, 123, 123)),
-            filled: true,
-            fillColor: Colors.grey[200],
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: const BorderSide(color: Colors.grey),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.0),
-              borderSide: const BorderSide(color: Colors.grey),
-            ),
-            suffixIcon: widget.obscureText
-                ? IconButton(
-                    icon: Icon(
-                      _isObscured ? Icons.visibility : Icons.visibility_off,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isObscured = !_isObscured;
-                      });
-                    },
-                  )
-                : null,
-            prefixIcon: widget.prefixIcon,
-            suffix: widget.suffixIcon),
+          labelText: widget.labelText,
+          hintText: widget.hintText,
+          hintStyle: TextStyle(color: theme.hintColor),
+          labelStyle:
+              TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7)),
+          filled: true,
+          fillColor: theme.colorScheme.surface,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide:
+                BorderSide(color: theme.colorScheme.onSurface.withOpacity(0.3)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: theme.colorScheme.primary),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide:
+                BorderSide(color: theme.colorScheme.onSurface.withOpacity(0.3)),
+          ),
+          suffixIcon: widget.obscureText
+              ? IconButton(
+                  icon: Icon(
+                    _isObscured ? Icons.visibility : Icons.visibility_off,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isObscured = !_isObscured;
+                    });
+                  },
+                )
+              : widget.suffixIcon,
+          prefixIcon: widget.prefixIcon,
+        ),
         keyboardType: widget.keyboardType,
         validator: widget.validator,
         obscureText: _isObscured,

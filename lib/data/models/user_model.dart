@@ -3,7 +3,8 @@
 import 'dart:convert';
 
 class UserModel {
-  final String uid;
+  final int userId; // db uid
+  final String uid; // firebase uid
   final String? fullName;
   final String? email;
   final String phoneNumber;
@@ -20,7 +21,8 @@ class UserModel {
   final String? updatedAt;
 
   UserModel({
-    required this.uid,
+    required this.userId, // db uid
+    required this.uid, // firebase uid
     this.fullName,
     this.email,
     required this.phoneNumber,
@@ -39,7 +41,8 @@ class UserModel {
 
   Map<String, dynamic> toMap() {
     return {
-      'firebase_uid': uid,
+      'user_id': userId, // db uid
+      'firebase_uid': uid, // firebase uid
       'full_name': fullName,
       'email': email,
       'phone_number': phoneNumber,
@@ -59,7 +62,8 @@ class UserModel {
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
-      uid: map['firebase_uid'] ?? '',
+      userId: map['user_id'], // db uid
+      uid: map['firebase_uid'] ?? '', // firebase uid
       fullName: map['full_name'],
       email: map['email'],
       phoneNumber: map['phone_number'] ?? '',
@@ -85,7 +89,8 @@ class UserModel {
       UserModel.fromMap(json.decode(source));
 
   UserModel copyWith({
-    String? uid,
+    int? userId, //db uid
+    String? uid, //firebase uid
     String? fullName,
     String? email,
     String? phoneNumber,
@@ -102,6 +107,7 @@ class UserModel {
     String? updatedAt,
   }) {
     return UserModel(
+      userId: userId ?? this.userId,
       uid: uid ?? this.uid,
       fullName: fullName ?? this.fullName,
       email: email ?? this.email,

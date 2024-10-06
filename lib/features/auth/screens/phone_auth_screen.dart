@@ -137,6 +137,11 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                         hintText: "Enter OTP",
                         keyboardType: TextInputType.number,
                         labelText: 'Enter OTP',
+                          style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface), // Add this line
+
                       ),
                       if (!_isExistingUser) ...[
                         const SizedBox(height: 16),

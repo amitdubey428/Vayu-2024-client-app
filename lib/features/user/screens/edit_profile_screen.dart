@@ -100,7 +100,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               widget.user.fullName?.isNotEmpty == true
                   ? widget.user.fullName!.substring(0, 1).toUpperCase()
                   : '?',
-              style: const TextStyle(fontSize: 40, color: Colors.white),
+              style: const TextStyle(fontSize: 40),
             ),
           ),
           const SizedBox(height: 8),
@@ -120,6 +120,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.teal),
         hintText: "Enter your $label",
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
       ),
     );
   }

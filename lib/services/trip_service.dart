@@ -93,9 +93,10 @@ class TripService {
     }
   }
 
-  Future<String> generateInviteLink(int tripId) async {
+  Future<Map<String, dynamic>> generateInviteLink(int tripId) async {
     try {
-      return await _tripRepository.generateInviteLink(tripId);
+      final invitationData = await _tripRepository.generateInviteLink(tripId);
+      return invitationData;
     } catch (e) {
       developer.log('Error in generateInviteLink: $e',
           name: 'trip_service', error: e);

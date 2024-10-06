@@ -41,6 +41,7 @@ class UserRepository {
 
   Future<UserModel> updateUser(UserModel user) async {
     try {
+      developer.log('Updating user: ${user.toMap()}');
       final response = await _apiService.put(
         '/users/update',
         body: user.toMap(),

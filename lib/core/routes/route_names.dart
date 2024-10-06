@@ -14,4 +14,7 @@ class Routes {
   static const String addEditActivity = '/addEditActivity';
   static const String profile = '/profile';
   static const String editProfile = '/editProfile';
+  static const String tripExpenseDashboard = '/trip-expense-dashboard';
+  static const String addEditExpense = '/add-edit-expense';
+  static const String expenseDetails = '/expense-details';
 }

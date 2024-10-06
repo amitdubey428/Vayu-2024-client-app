@@ -41,50 +41,48 @@ class ApiService {
 
       final uri = Uri.parse('$baseUrl$endpoint');
       http.Response response;
-      final jsonBody = body is String ? body : json.encode(body);
-      // Handle PUT requests specially
-      if (method == 'PUT') {
-        dynamic jsonBody;
-
-        if (body is String) {
-          // If body is already a JSON string, use it as is
-          jsonBody = body;
-        } else if (body is Map) {
-          // If body is a Map, remove null values and encode to JSON
-          jsonBody = json.encode(Map.fromEntries((body as Map<String, dynamic>)
-              .entries
-              .where((entry) => entry.value != null)));
-        } else {
-          // For other types, encode as is
-          jsonBody = json.encode(body);
-        }
-
-        fullHeaders['Content-Type'] = 'application/json';
-        response =
-            await httpClient.put(uri, headers: fullHeaders, body: jsonBody);
+      // Prepare the body
+      dynamic jsonBody;
+      if (body is String) {
+        // If body is already a JSON string, use it as is
+        jsonBody = body;
+      } else if (body is Map) {
+        // If body is a Map, remove null values and encode to JSON
+        jsonBody = json.encode(Map.fromEntries((body as Map<String, dynamic>)
+            .entries
+            .where((entry) => entry.value != null)));
       } else {
-        switch (method) {
-          case 'GET':
-            response = await httpClient.get(uri, headers: fullHeaders);
-            break;
-          case 'POST':
-            response = await httpClient.post(uri,
-                headers: fullHeaders, body: jsonBody);
-            break;
-          case 'PATCH':
-            response = await httpClient.patch(uri,
-                headers: fullHeaders, body: jsonBody);
-            break;
-          case 'PUT':
-            response =
-                await httpClient.put(uri, headers: fullHeaders, body: body);
-            break;
-          case 'DELETE':
-            response = await httpClient.delete(uri, headers: fullHeaders);
-            break;
-          default:
-            throw ArgumentError('Unsupported HTTP method: $method');
-        }
+        // For other types, encode as is
+        jsonBody = json.encode(body);
+      }
+
+      switch (method) {
+        case 'GET':
+          response = await httpClient.get(uri, headers: fullHeaders);
+          break;
+        case 'POST':
+          developer.log('POST Request to: $uri', name: 'api_service');
+          developer.log('POST Request headers: $fullHeaders',
+              name: 'api_service');
+          developer.log('POST Request body: $jsonBody', name: 'api_service');
+          response =
+              await httpClient.post(uri, headers: fullHeaders, body: jsonBody);
+          developer.log('POST Request response: ${response.body}',
+              name: 'api_service');
+          break;
+        case 'PUT':
+          response =
+              await httpClient.put(uri, headers: fullHeaders, body: jsonBody);
+          break;
+        case 'PATCH':
+          response =
+              await httpClient.patch(uri, headers: fullHeaders, body: jsonBody);
+          break;
+        case 'DELETE':
+          response = await httpClient.delete(uri, headers: fullHeaders);
+          break;
+        default:
+          throw ArgumentError('Unsupported HTTP method: $method');
       }
 
       if (response.statusCode == 307) {
@@ -99,18 +97,25 @@ class ApiService {
               break;
             case 'POST':
               response = await httpClient.post(redirectUri,
-                  headers: fullHeaders, body: body);
+                  headers: fullHeaders, body: jsonBody);
+              developer.log(
+                  'Redirected POST Request response: ${response.body}',
+                  name: 'api_service');
+              developer.log(
+                  'Redirected POST Request status code: ${response.statusCode}',
+                  name: 'api_service');
               break;
             case 'PUT':
               response = await httpClient.put(redirectUri,
-                  headers: fullHeaders, body: body);
+                  headers: fullHeaders, body: jsonBody);
               break;
             case 'PATCH':
               response = await httpClient.patch(redirectUri,
-                  headers: fullHeaders, body: body);
+                  headers: fullHeaders, body: jsonBody);
               break;
             case 'DELETE':
-              response = await httpClient.delete(uri, headers: fullHeaders);
+              response =
+                  await httpClient.delete(redirectUri, headers: fullHeaders);
               break;
           }
         }
@@ -124,7 +129,6 @@ class ApiService {
     } catch (e) {
       developer.log('API Error: $e', name: 'api_service');
       developer.log('Request body: $body');
-      developer.log('Stack trace: ${StackTrace.current}');
 
       rethrow;
     }

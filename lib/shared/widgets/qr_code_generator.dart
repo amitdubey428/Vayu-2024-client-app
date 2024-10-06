@@ -8,13 +8,21 @@ class QRCodeGenerator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 200,
-      height: 200,
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.white : Colors.black12,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: QrImageView(
         data: data,
         version: QrVersions.auto,
         size: 200.0,
+        backgroundColor: Colors.white,
+        eyeStyle: const QrEyeStyle(color: Colors.black),
+        dataModuleStyle: const QrDataModuleStyle(color: Colors.black),
       ),
     );
   }

@@ -54,11 +54,14 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     );
 
     try {
-      final inviteLink =
+      final invitationData =
           await getIt<TripService>().generateInviteLink(_tripData!.tripId!);
       if (mounted) {
         Navigator.of(context).pop();
-        _showInvitationDialog(inviteLink);
+        _showInvitationDialog(
+          invitationData['invitation_link'],
+          DateTime.parse(invitationData['expires_at']),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -71,78 +74,115 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     }
   }
 
-  void _showInvitationDialog(String inviteLink) {
+  void _showInvitationDialog(String inviteLink, DateTime expiresAt) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return Dialog(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.8,
-              maxWidth: MediaQuery.of(context).size.width * 0.9,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              shape: BoxShape.rectangle,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10.0,
+                  offset: Offset(0.0, 10.0),
+                ),
+              ],
             ),
-            child: IntrinsicHeight(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'Invite to "${_tripData!.tripName}"',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                      textAlign: TextAlign.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  'Invite to "${_tripData!.tripName}"',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                QRCodeGenerator(data: inviteLink),
+                const SizedBox(height: 20),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: Theme.of(context).colorScheme.primary),
+                  ),
+                  child: SelectableText(
+                    inviteLink,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 14,
                     ),
+                    textAlign: TextAlign.center,
                   ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            QRCodeGenerator(data: inviteLink),
-                            const SizedBox(height: 20),
-                            SelectableText(inviteLink),
-                          ],
-                        ),
-                      ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Expires on: ${DateFormat('MMM dd, yyyy HH:mm').format(expiresAt.toLocal())}',
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildActionButton(
+                      icon: Icons.copy,
+                      label: 'Copy Link',
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: inviteLink));
+                        Navigator.of(context).pop();
+                        SnackbarUtil.showSnackbar('Link copied to clipboard',
+                            type: SnackbarType.success);
+                      },
                     ),
-                  ),
-                  ButtonBar(
-                    alignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      TextButton(
-                        child: const Text('Copy Link'),
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: inviteLink));
-                          Navigator.of(context).pop();
-                          SnackbarUtil.showSnackbar('Link copied to clipboard',
-                              type: SnackbarType.success);
-                        },
-                      ),
-                      TextButton(
-                        child: const Text('Share'),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          Share.share(
-                            'Join my trip "${_tripData!.tripName}" on Vayu!\n\n$inviteLink',
-                            subject: 'Invitation to join a trip on Vayu',
-                          );
-                        },
-                      ),
-                      TextButton(
-                        child: const Text('Close'),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    _buildActionButton(
+                      icon: Icons.share,
+                      label: 'Share',
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Share.share(
+                          'Join my trip "${_tripData!.tripName}" on Vayu!\n\n$inviteLink',
+                          subject: 'Invitation to join a trip on Vayu',
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return ElevatedButton.icon(
+      icon: Icon(icon),
+      label: Text(label),
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+      ),
     );
   }
 
@@ -546,13 +586,13 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         children: [
           if (_tripData!.isArchived)
             Container(
-              color: Colors.grey[300],
+              color: Theme.of(context).colorScheme.surface,
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
               child: Text(
                 'Archived Trip',
                 style: TextStyle(
-                  color: Colors.grey[800],
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
@@ -567,11 +607,16 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 AnimatedExpansionTile(
                   title: 'Description',
                   icon: Icons.description,
-                  backgroundColor: Colors.blue[50],
+                  lightModeColor: Colors.blue[50]!,
+                  darkModeColor: Colors.blue[900]!,
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Text(_tripData!.description),
+                      child: Text(
+                        _tripData!.description,
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface),
+                      ),
                     ),
                   ],
                 ),
@@ -579,7 +624,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 AnimatedExpansionTile(
                   title: 'Participants',
                   icon: Icons.people,
-                  backgroundColor: Colors.green[50],
+                  lightModeColor: Colors.green[50]!,
+                  darkModeColor: Colors.green[900]!,
                   children: [
                     _buildParticipantsList(_tripData!.participants),
                   ],
@@ -588,9 +634,32 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 AnimatedExpansionTile(
                   title: 'Day Plans',
                   icon: Icons.calendar_today,
-                  backgroundColor: Colors.orange[50],
+                  lightModeColor: Colors.orange[50]!,
+                  darkModeColor: Colors.orange[900]!,
                   children: [
                     _buildDayPlansList(),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                AnimatedExpansionTile(
+                  title: 'Expenses',
+                  icon: Icons.attach_money,
+                  lightModeColor: Colors.purple[50]!,
+                  darkModeColor: Colors.purple[900]!,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushNamed(
+                            context,
+                            Routes.tripExpenseDashboard,
+                            arguments: _tripData,
+                          );
+                        },
+                        child: const Text('View Expenses Dashboard'),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -697,16 +766,17 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   Widget _buildDateHeader(TripModel trip) {
     return Container(
       color: trip.isArchived
-          ? Colors.grey[400]
+          ? Theme.of(context).colorScheme.surface
           : Theme.of(context).colorScheme.primary,
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           Expanded(child: _buildDateCard(trip.startDate)),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Icon(Icons.arrow_forward, color: Colors.white, size: 30),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Icon(Icons.arrow_forward,
+                color: Theme.of(context).colorScheme.onPrimary, size: 30),
           ),
           Expanded(child: _buildDateCard(trip.endDate)),
         ],
@@ -716,7 +786,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
   Widget _buildDateCard(DateTime date) {
     return Card(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       elevation: 4,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
@@ -774,6 +844,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                       : participant
                           .phoneNumber, // Show phone number if name is empty
                   overflow: TextOverflow.ellipsis,
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
                 ),
               ),
               if (participant.isAdmin)
@@ -782,9 +854,15 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 _buildTag('Me', Theme.of(context).colorScheme.secondary),
             ],
           ),
-          subtitle: Text(participant.email ?? ""),
+          subtitle: Text(
+            participant.email ?? "",
+            style: TextStyle(
+                color:
+                    Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+          ),
           trailing: IconButton(
-            icon: const Icon(Icons.phone),
+            icon: Icon(Icons.phone,
+                color: Theme.of(context).colorScheme.onSurface),
             onPressed: () async {
               final Uri phoneUri =
                   Uri(scheme: 'tel', path: participant.phoneNumber);
@@ -826,7 +904,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withOpacity(0.2),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(

@@ -145,14 +145,20 @@ class TripRepository {
     }
   }
 
-  Future<String> generateInviteLink(int tripId) async {
+  Future<Map<String, dynamic>> generateInviteLink(int tripId) async {
     try {
       final response = await _apiService.post('/trips/$tripId/invite');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         final String invitationCode = data['invitation_code'];
-        return 'vayuapp://join-trip/$invitationCode';
+        final String expiresAt = data['expires_at'];
+
+        return {
+          'invitation_link': 'vayuapp://join-trip/$invitationCode',
+          'invitation_code': invitationCode,
+          'expires_at': expiresAt,
+        };
       } else {
         throw ApiException('Failed to generate invite link: ${response.body}');
       }

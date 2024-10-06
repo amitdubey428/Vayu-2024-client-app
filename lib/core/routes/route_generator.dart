@@ -1,9 +1,17 @@
 // lib/routes/route_generator.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:vayu_flutter_app/blocs/expense/expense_bloc.dart';
+import 'package:vayu_flutter_app/core/di/service_locator.dart';
+import 'package:vayu_flutter_app/data/models/trip_model.dart';
 import 'package:vayu_flutter_app/data/models/user_model.dart';
+import 'package:vayu_flutter_app/data/repositories/expense_repository.dart';
 import 'package:vayu_flutter_app/features/auth/screens/email_verification_screen.dart';
 import 'package:vayu_flutter_app/features/auth/screens/phone_auth_screen.dart';
 import 'package:vayu_flutter_app/features/dashboard/screens/dashboard_screen.dart';
+import 'package:vayu_flutter_app/features/expenses/screens/add_edit_expense_screen.dart';
+import 'package:vayu_flutter_app/features/expenses/screens/expense_details_screen.dart';
+import 'package:vayu_flutter_app/features/expenses/screens/trip_expense_dashboard.dart';
 import 'package:vayu_flutter_app/features/onboarding/screens/welcome.dart';
 import 'package:vayu_flutter_app/features/trips/screens/add_edit_activity_screen.dart';
 import 'package:vayu_flutter_app/features/trips/screens/add_edit_day_plan_screen.dart';
@@ -75,6 +83,39 @@ class RouteGenerator {
         final user = settings.arguments as UserModel;
         return MaterialPageRoute(
           builder: (_) => EditProfileScreen(user: user),
+        );
+      case Routes.tripExpenseDashboard:
+        final trip = settings.arguments as TripModel;
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (context) => ExpenseBloc(getIt<ExpenseRepository>()),
+            child: TripExpenseDashboard(trip: trip),
+          ),
+        );
+      case Routes.addEditExpense:
+        final arguments = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider<ExpenseBloc>(
+            create: (context) => ExpenseBloc(getIt<ExpenseRepository>()),
+            child: Builder(
+              builder: (context) => AddEditExpenseScreen(
+                tripId: arguments['tripId'],
+                expense: arguments['expense'],
+                tripParticipants: arguments['tripParticipants'] ?? [],
+                expenseBloc: context.read<ExpenseBloc>(),
+              ),
+            ),
+          ),
+        );
+      case Routes.expenseDetails:
+        final arguments = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (_) => ExpenseDetailsScreen(
+            expense: arguments['expense'],
+            tripParticipants: arguments['tripParticipants'],
+            onExpenseUpdated: arguments['onExpenseUpdated'],
+            expenseBloc: arguments['expenseBloc'],
+          ),
         );
 
       default:

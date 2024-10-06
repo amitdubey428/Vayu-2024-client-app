@@ -28,6 +28,8 @@ class AuthNotifier extends ChangeNotifier {
   String? _verificationId;
   String? get verificationId => _verificationId;
 
+  int? get postgresUserId => _userModel?.userId;
+
   AuthNotifier(this._auth, this._apiService, this._userRepository) {
     _auth.authStateChanges().listen(_onAuthStateChanged);
   }

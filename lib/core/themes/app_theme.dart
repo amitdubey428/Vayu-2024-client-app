@@ -98,6 +98,7 @@ class AppTheme {
       secondary: secondaryColor,
       surface: surfaceDark,
       error: accentColor2,
+      onSurface: textLight,
     ),
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(
@@ -109,7 +110,10 @@ class AppTheme {
         borderSide: const BorderSide(color: secondaryColor, width: 2),
       ),
       filled: true,
-      fillColor: surfaceDark,
+      fillColor: Colors.grey[800],
+      hintStyle: TextStyle(color: Colors.grey[400]),
+      labelStyle: TextStyle(color: Colors.grey[300]),
+      prefixStyle: const TextStyle(color: textLight),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
@@ -129,5 +133,6 @@ class AppTheme {
       bodyMedium: TextStyle(color: textLight),
       bodySmall: TextStyle(color: textLight),
     ),
+    cardColor: Colors.grey[850],
   );
 }

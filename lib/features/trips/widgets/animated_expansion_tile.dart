@@ -4,14 +4,16 @@ class AnimatedExpansionTile extends StatefulWidget {
   final String title;
   final List<Widget> children;
   final IconData icon;
-  final Color? backgroundColor;
+  final Color lightModeColor;
+  final Color darkModeColor;
 
   const AnimatedExpansionTile({
     super.key,
     required this.title,
     required this.children,
     required this.icon,
-    this.backgroundColor,
+    required this.lightModeColor,
+    required this.darkModeColor,
   });
 
   @override
@@ -56,9 +58,13 @@ class _AnimatedExpansionTileState extends State<AnimatedExpansionTile>
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor =
+        isDarkMode ? widget.darkModeColor : widget.lightModeColor;
+
     return Container(
       decoration: BoxDecoration(
-        color: widget.backgroundColor ?? Theme.of(context).cardColor,
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(8),
       ),
       margin: const EdgeInsets.symmetric(vertical: 4),
