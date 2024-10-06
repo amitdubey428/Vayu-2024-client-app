@@ -234,4 +234,47 @@ class TripRepository {
       throw ApiException('An error occurred while deleting day plan: $e');
     }
   }
+
+  Future<bool> isSoleAdmin(int tripId) async {
+    try {
+      final response = await _apiService.get('/trips/$tripId/is-sole-admin');
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        return data['is_sole_admin'] as bool;
+      } else {
+        throw ApiException(
+            'Failed to check sole admin status: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw ApiException(
+          'An error occurred while checking sole admin status: $e');
+    }
+  }
+
+  Future<void> makeUserAdmin(int tripId, int userId) async {
+    try {
+      final response = await _apiService.patch(
+        '/trips/$tripId/make-admin/$userId',
+        headers: {'Content-Type': 'application/json'},
+      );
+      if (response.statusCode != 200) {
+        throw ApiException('Failed to make user admin: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw ApiException('An error occurred while making user admin: $e');
+    }
+  }
+
+  Future<void> removeParticipant(int tripId, int userId) async {
+    try {
+      final response =
+          await _apiService.delete('/trips/$tripId/remove-participant/$userId');
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw ApiException(
+            'Failed to remove participant: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw ApiException('An error occurred while removing participant: $e');
+    }
+  }
 }

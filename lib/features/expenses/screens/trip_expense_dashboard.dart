@@ -29,10 +29,21 @@ class TripExpenseDashboard extends StatelessWidget {
   }
 }
 
-class _TripExpenseDashboardContent extends StatelessWidget {
+class _TripExpenseDashboardContent extends StatefulWidget {
   final TripModel trip;
 
   const _TripExpenseDashboardContent({required this.trip});
+
+  @override
+  _TripExpenseDashboardContentState createState() =>
+      _TripExpenseDashboardContentState();
+}
+
+class _TripExpenseDashboardContentState
+    extends State<_TripExpenseDashboardContent> {
+  DateTime? _startDate;
+  DateTime? _endDate;
+  bool _isAscending = false;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +53,7 @@ class _TripExpenseDashboardContent extends StatelessWidget {
         title: GestureDetector(
           onLongPress: () => _showFullTripName(context),
           child: Text(
-            trip.tripName,
+            widget.trip.tripName,
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -84,7 +95,7 @@ class _TripExpenseDashboardContent extends StatelessWidget {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Trip Name'),
-          content: Text(trip.tripName),
+          content: Text(widget.trip.tripName),
           actions: <Widget>[
             TextButton(
               child: const Text('Close'),
@@ -101,12 +112,15 @@ class _TripExpenseDashboardContent extends StatelessWidget {
   Widget _buildContent(BuildContext context, ExpensesLoaded state) {
     return RefreshIndicator(
       onRefresh: () async {
-        context.read<ExpenseBloc>().add(LoadExpenses(trip.tripId!));
+        context.read<ExpenseBloc>().add(LoadExpenses(widget.trip.tripId!));
       },
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
             child: ExpenseSummaryCard(summary: state.summary),
+          ),
+          SliverToBoxAdapter(
+            child: _buildFilterOptions(context),
           ),
           SliverPadding(
             padding: const EdgeInsets.only(top: 16),
@@ -116,6 +130,28 @@ class _TripExpenseDashboardContent extends StatelessWidget {
                     child: _buildEmptyExpenseList(context),
                   )
                 : _buildExpenseList(context, state.summary.expenses),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterOptions(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          ElevatedButton.icon(
+            onPressed: () => _showDateFilterDialog(context),
+            icon: const Icon(Icons.filter_list),
+            label: const Text('Filter'),
+          ),
+          ElevatedButton.icon(
+            onPressed: _toggleSortOrder,
+            icon:
+                Icon(_isAscending ? Icons.arrow_upward : Icons.arrow_downward),
+            label: Text(_isAscending ? 'Oldest First' : 'Newest First'),
           ),
         ],
       ),
@@ -147,11 +183,27 @@ class _TripExpenseDashboardContent extends StatelessWidget {
   Widget _buildExpenseList(BuildContext context, List<ExpenseModel> expenses) {
     final currentUserId = context.read<AuthNotifier>().postgresUserId;
 
-    // Sort expenses by createdAt date in descending order (newest first)
-    expenses.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    // Apply date filters
+    List<ExpenseModel> filteredExpenses = expenses;
+    if (_startDate != null) {
+      filteredExpenses = filteredExpenses
+          .where((e) => e.createdAt.isAfter(_startDate!))
+          .toList();
+    }
+    if (_endDate != null) {
+      filteredExpenses = filteredExpenses
+          .where((e) =>
+              e.createdAt.isBefore(_endDate!.add(const Duration(days: 1))))
+          .toList();
+    }
+
+    // Sort expenses
+    filteredExpenses.sort((a, b) => _isAscending
+        ? a.createdAt.compareTo(b.createdAt)
+        : b.createdAt.compareTo(a.createdAt));
 
     // Group expenses by date
-    final groupedExpenses = groupExpensesByDate(expenses);
+    final groupedExpenses = groupExpensesByDate(filteredExpenses);
 
     return SliverList(
       delegate: SliverChildBuilderDelegate(
@@ -204,15 +256,15 @@ class _TripExpenseDashboardContent extends StatelessWidget {
       context,
       Routes.addEditExpense,
       arguments: {
-        'tripId': trip.tripId,
-        'tripParticipants': trip.participants,
+        'tripId': widget.trip.tripId,
+        'tripParticipants': widget.trip.participants,
       },
     );
 
     if (result == true) {
       // Refresh expenses if the expense was added successfully
       if (context.mounted) {
-        context.read<ExpenseBloc>().add(LoadExpenses(trip.tripId!));
+        context.read<ExpenseBloc>().add(LoadExpenses(widget.trip.tripId!));
       }
     }
   }
@@ -224,9 +276,9 @@ class _TripExpenseDashboardContent extends StatelessWidget {
       MaterialPageRoute(
         builder: (context) => ExpenseDetailsScreen(
           expense: expense,
-          tripParticipants: trip.participants,
+          tripParticipants: widget.trip.participants,
           onExpenseUpdated: (updatedExpense) {
-            expenseBloc.add(LoadExpenses(trip.tripId!));
+            expenseBloc.add(LoadExpenses(widget.trip.tripId!));
           },
           expenseBloc: expenseBloc,
         ),
@@ -234,7 +286,7 @@ class _TripExpenseDashboardContent extends StatelessWidget {
     );
 
     if (updatedExpense != null) {
-      expenseBloc.add(LoadExpenses(trip.tripId!));
+      expenseBloc.add(LoadExpenses(widget.trip.tripId!));
     }
   }
 
@@ -245,7 +297,7 @@ class _TripExpenseDashboardContent extends StatelessWidget {
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
               BalancesScreen(
-            trip: trip,
+            trip: widget.trip,
             summary: state.summary,
           ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -260,5 +312,62 @@ class _TripExpenseDashboardContent extends StatelessWidget {
         ),
       );
     }
+  }
+
+  void _showDateFilterDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Filter Expenses'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ElevatedButton(
+                onPressed: () async {
+                  final picked = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime.now(),
+                    initialDateRange: DateTimeRange(
+                      start: _startDate ??
+                          DateTime.now().subtract(const Duration(days: 30)),
+                      end: _endDate ?? DateTime.now(),
+                    ),
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      _startDate = picked.start;
+                      _endDate = picked.end;
+                    });
+                    if (context.mounted) {
+                      Navigator.of(context).pop();
+                    }
+                  }
+                },
+                child: const Text('Select Date Range'),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _startDate = null;
+                    _endDate = null;
+                  });
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Clear Filters'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _toggleSortOrder() {
+    setState(() {
+      _isAscending = !_isAscending;
+    });
   }
 }

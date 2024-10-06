@@ -17,7 +17,6 @@ import 'package:vayu_flutter_app/shared/utils/location_utils.dart';
 import 'package:vayu_flutter_app/shared/widgets/qr_code_generator.dart';
 import 'package:vayu_flutter_app/shared/widgets/snackbar_util.dart';
 import 'package:vayu_flutter_app/shared/widgets/custom_loading_indicator.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class TripDetailScreen extends StatefulWidget {
   final int tripId;
@@ -340,30 +339,10 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 16),
-                    if (dayPlan.area != null && dayPlan.area!.isNotEmpty)
-                      _buildDetailItem(
-                          Icons.location_on, 'Area', dayPlan.area!),
-                    if (dayPlan.notes != null && dayPlan.notes!.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      _buildDetailItem(Icons.note, 'Notes', dayPlan.notes!),
-                    ],
-                    if (dayPlan.stays.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        'Stays',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      ...dayPlan.stays.map((stay) => _buildStayItem(stay)),
-                    ],
-                    if (dayPlan.activities.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        'Activities',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      ...dayPlan.activities
-                          .map((activity) => _buildActivityItem(activity)),
-                    ],
+                    if (_isDayPlanEmpty(dayPlan))
+                      _buildEmptyDayPlanContent()
+                    else
+                      ..._buildDayPlanContent(dayPlan),
                     const SizedBox(height: 24),
                     if (_isCurrentUserAdmin())
                       SizedBox(
@@ -373,7 +352,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                             Navigator.of(context).pop();
                             _editDayPlan(dayPlan);
                           },
-                          child: const Text('Edit Day Plan'),
+                          child: Text(_isDayPlanEmpty(dayPlan)
+                              ? 'Add Day Plan'
+                              : 'Edit Day Plan'),
                         ),
                       ),
                   ],
@@ -384,6 +365,71 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         );
       },
     );
+  }
+
+  bool _isDayPlanEmpty(DayPlanModel dayPlan) {
+    return dayPlan.area == null &&
+        dayPlan.notes == null &&
+        dayPlan.stays.isEmpty &&
+        dayPlan.activities.isEmpty;
+  }
+
+  Widget _buildEmptyDayPlanContent() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.event_note,
+            size: 64,
+            color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No plans for this day yet',
+            style: TextStyle(
+              fontSize: 18,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Check back later for updates',
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildDayPlanContent(DayPlanModel dayPlan) {
+    return [
+      if (dayPlan.area != null && dayPlan.area!.isNotEmpty)
+        _buildDetailItem(Icons.location_on, 'Area', dayPlan.area!),
+      if (dayPlan.notes != null && dayPlan.notes!.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        _buildDetailItem(Icons.note, 'Notes', dayPlan.notes!),
+      ],
+      if (dayPlan.stays.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        Text(
+          'Stays',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        ...dayPlan.stays.map((stay) => _buildStayItem(stay)),
+      ],
+      if (dayPlan.activities.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        Text(
+          'Activities',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        ...dayPlan.activities.map((activity) => _buildActivityItem(activity)),
+      ],
+    ];
   }
 
   Widget _buildDetailItem(IconData icon, String label, String value) {
@@ -823,6 +869,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
   Widget _buildParticipantsList(List<UserPublicInfo> participants) {
     final currentUserId = getIt<AuthNotifier>().currentUser!.uid;
+    final isCurrentUserAdmin = _isCurrentUserAdmin();
 
     return ListView.builder(
       shrinkWrap: true,
@@ -860,20 +907,235 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 color:
                     Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
           ),
-          trailing: IconButton(
-            icon: Icon(Icons.phone,
-                color: Theme.of(context).colorScheme.onSurface),
-            onPressed: () async {
-              final Uri phoneUri =
-                  Uri(scheme: 'tel', path: participant.phoneNumber);
-              if (await canLaunchUrl(phoneUri)) {
-                await launchUrl(phoneUri);
-              } else {
-                SnackbarUtil.showSnackbar("Could not launch phone call",
-                    type: SnackbarType.error);
-              }
-            },
+          trailing: _buildParticipantActions(
+              participant, isCurrentUserAdmin, currentUserId),
+        );
+      },
+    );
+  }
+
+  Widget _buildParticipantActions(UserPublicInfo participant,
+      bool isCurrentUserAdmin, String currentUserId) {
+    if (participant.firebaseUid == currentUserId) {
+      return IconButton(
+        icon:
+            Icon(Icons.exit_to_app, color: Theme.of(context).colorScheme.error),
+        onPressed: () => _showLeaveConfirmationDialog(),
+      );
+    } else if (isCurrentUserAdmin) {
+      return PopupMenuButton<String>(
+        onSelected: (value) => _handleParticipantAction(value, participant),
+        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+          if (!participant.isAdmin)
+            const PopupMenuItem<String>(
+              value: 'make_admin',
+              child: Text('Make Admin'),
+            ),
+          const PopupMenuItem<String>(
+            value: 'remove',
+            child: Text('Remove from Trip'),
           ),
+        ],
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  void _handleParticipantAction(String action, UserPublicInfo participant) {
+    switch (action) {
+      case 'make_admin':
+        _showMakeAdminConfirmationDialog(participant);
+        break;
+      case 'remove':
+        _showRemoveParticipantConfirmationDialog(participant);
+        break;
+    }
+  }
+
+  void _showLeaveConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Leave Trip'),
+          content: const Text('Are you sure you want to leave this trip?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text('Leave'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _leaveTrip();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _leaveTrip() async {
+    try {
+      final tripService = getIt<TripService>();
+
+      // Check if user is the only member
+      if (_tripData!.participants.length == 1) {
+        _showDeleteTripConfirmationDialog();
+        return;
+      }
+
+      // Check if user is the sole admin
+      if (_isCurrentUserAdmin() &&
+          await tripService.isSoleAdmin(widget.tripId)) {
+        _showSoleAdminWarningDialog();
+        return;
+      }
+
+      await tripService.leaveTrip(widget.tripId);
+      if (mounted) {
+        Navigator.of(context).pop(); // Return to previous screen
+        SnackbarUtil.showSnackbar(
+          'You have left the trip successfully',
+          type: SnackbarType.success,
+        );
+      }
+    } catch (e) {
+      SnackbarUtil.showSnackbar(
+        'Failed to leave trip: ${e.toString()}',
+        type: SnackbarType.error,
+      );
+    }
+  }
+
+  void _showDeleteTripConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Trip'),
+          content: const Text(
+              'You are the only member of this trip. Do you want to delete it?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text('Delete'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteTrip();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSoleAdminWarningDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Cannot Leave Trip'),
+          content: const Text(
+              'You are the only admin of this trip. Please make another user an admin before leaving.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _makeUserAdmin(int userId) async {
+    try {
+      final tripService = getIt<TripService>();
+      await tripService.makeUserAdmin(widget.tripId, userId);
+      await _refreshTripData();
+      SnackbarUtil.showSnackbar(
+        'User has been made an admin successfully',
+        type: SnackbarType.success,
+      );
+    } catch (e) {
+      SnackbarUtil.showSnackbar(
+        'Failed to make user an admin: ${e.toString()}',
+        type: SnackbarType.error,
+      );
+    }
+  }
+
+  Future<void> _removeParticipant(int userId) async {
+    try {
+      final tripService = getIt<TripService>();
+      await tripService.removeParticipant(widget.tripId, userId);
+      await _refreshTripData();
+      SnackbarUtil.showSnackbar(
+        'Participant has been removed successfully',
+        type: SnackbarType.success,
+      );
+    } catch (e) {
+      SnackbarUtil.showSnackbar(
+        'Failed to remove participant: ${e.toString()}',
+        type: SnackbarType.error,
+      );
+    }
+  }
+
+  void _showMakeAdminConfirmationDialog(UserPublicInfo participant) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Make Admin'),
+          content: Text(
+              'Are you sure you want to make ${participant.fullName} an admin?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text('Make Admin'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _makeUserAdmin(participant.userId);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showRemoveParticipantConfirmationDialog(UserPublicInfo participant) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Remove Participant'),
+          content: Text(
+              'Are you sure you want to remove ${participant.fullName} from the trip?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text('Remove'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _removeParticipant(participant.userId);
+              },
+            ),
+          ],
         );
       },
     );
@@ -899,6 +1161,29 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   }
 
   Widget _buildTag(String text, Color color) {
+    // Special case for the "Me" tag
+    if (text == 'Me') {
+      return Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            text,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // For other tags (e.g., "Admin")
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Container(

@@ -184,4 +184,33 @@ class TripService {
       rethrow;
     }
   }
+
+  Future<bool> isSoleAdmin(int tripId) async {
+    try {
+      return await _tripRepository.isSoleAdmin(tripId);
+    } catch (e) {
+      developer.log('Error in isSoleAdmin: $e', name: 'trip_service', error: e);
+      rethrow;
+    }
+  }
+
+  Future<void> makeUserAdmin(int tripId, int userId) async {
+    try {
+      await _tripRepository.makeUserAdmin(tripId, userId);
+    } catch (e) {
+      developer.log('Error in makeUserAdmin: $e',
+          name: 'trip_service', error: e);
+      rethrow;
+    }
+  }
+
+  Future<void> removeParticipant(int tripId, int userId) async {
+    try {
+      await _tripRepository.removeParticipant(tripId, userId);
+    } catch (e) {
+      developer.log('Error in removeParticipant: $e',
+          name: 'trip_service', error: e);
+      rethrow;
+    }
+  }
 }
