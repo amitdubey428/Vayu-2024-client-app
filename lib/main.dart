@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -16,19 +20,35 @@ import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/core/themes/app_theme.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:vayu_flutter_app/core/utils/globals.dart';
+import 'package:vayu_flutter_app/shared/utils/local_notifications.dart';
 import 'package:vayu_flutter_app/shared/widgets/custom_loading_indicator.dart';
 import 'firebase_options.dart';
 import 'dart:developer' as developer;
+
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  developer.log("Background message received: ${message.notification?.title}");
+  // Handle background message
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await dotenv.load(fileName: ".env");
+
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
+
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
     await setupServiceLocator();
     await DefaultCacheManager().emptyCache();
+    await setupFlutterNotifications();
+    FirebaseMessaging.onMessage.listen(showFlutterNotification);
+    // Set up foreground message handling
 
     runApp(const MyApp());
   } catch (e) {
@@ -49,6 +69,28 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     initUniLinks();
+    _setupPeriodicDeviceCheck();
+    _requestNotificationPermissions();
+  }
+
+  Future<void> _requestNotificationPermissions() async {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    developer.log('User granted permission: ${settings.authorizationStatus}');
+  }
+
+  void _setupPeriodicDeviceCheck() {
+    // Check and update device token every 24 hours
+    Timer.periodic(const Duration(hours: 24), (timer) {
+      final authNotifier = getIt<AuthNotifier>();
+      if (authNotifier.currentUser != null) {
+        authNotifier.registerDevice();
+      }
+    });
   }
 
   Future<void> initUniLinks() async {

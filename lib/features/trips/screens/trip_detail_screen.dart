@@ -17,6 +17,7 @@ import 'package:vayu_flutter_app/shared/utils/location_utils.dart';
 import 'package:vayu_flutter_app/shared/widgets/qr_code_generator.dart';
 import 'package:vayu_flutter_app/shared/widgets/snackbar_util.dart';
 import 'package:vayu_flutter_app/shared/widgets/custom_loading_indicator.dart';
+import 'dart:developer' as developer;
 
 class TripDetailScreen extends StatefulWidget {
   final int tripId;
@@ -550,9 +551,11 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   Future<void> _loadTripData() async {
     try {
       final trip = await getIt<TripService>().getTripDetails(widget.tripId);
+
       setState(() {
         _tripData = trip;
         _isLoading = false;
+        _error = null;
       });
     } catch (e) {
       if (mounted) {
@@ -577,7 +580,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.tripName.toUpperCase(),
+          _tripData?.tripName.toUpperCase() ?? widget.tripName.toUpperCase(),
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Theme.of(context).colorScheme.primary,
@@ -606,113 +609,120 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _refreshTripData,
-        child: _isLoading
-            ? const Center(child: CustomLoadingIndicator(message: 'Loading...'))
-            : _error != null
-                ? Center(child: Text(_error!))
-                : _tripData == null
-                    ? const Center(child: Text('No trip data available'))
-                    : _buildTripContent(),
-      ),
-      floatingActionButton: _tripData == null || _tripData!.isArchived
-          ? null
-          : FloatingActionButton(
-              onPressed: _generateAndShareInviteLink,
-              child: const Icon(Icons.person_add),
-            ),
+      body: _isLoading
+          ? const Center(child: CustomLoadingIndicator(message: 'Loading...'))
+          : _error != null
+              ? Center(child: Text(_error!))
+              : _tripData == null
+                  ? const Center(child: Text('No trip data available'))
+                  : RefreshIndicator(
+                      onRefresh: _refreshTripData,
+                      child: _buildTripContent(),
+                    ),
+      floatingActionButton:
+          _tripData != null && !_tripData!.isArchived && _isCurrentUserAdmin()
+              ? FloatingActionButton(
+                  onPressed: _generateAndShareInviteLink,
+                  child: const Icon(Icons.person_add),
+                )
+              : null,
     );
   }
 
   Widget _buildTripContent() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_tripData!.isArchived)
-            Container(
-              color: Theme.of(context).colorScheme.surface,
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              child: Text(
-                'Archived Trip',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          _buildDateHeader(_tripData!),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AnimatedExpansionTile(
-                  title: 'Description',
-                  icon: Icons.description,
-                  lightModeColor: Colors.blue[50]!,
-                  darkModeColor: Colors.blue[900]!,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        _tripData!.description,
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface),
-                      ),
+    return CustomScrollView(
+      physics:
+          const AlwaysScrollableScrollPhysics(), // This is crucial for pull-to-refresh
+      slivers: [
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_tripData!.isArchived)
+                Container(
+                  color: Theme.of(context).colorScheme.surface,
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: Text(
+                    'Archived Trip',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
                     ),
-                  ],
+                    textAlign: TextAlign.center,
+                  ),
                 ),
-                const SizedBox(height: 8),
-                AnimatedExpansionTile(
-                  title: 'Participants',
-                  icon: Icons.people,
-                  lightModeColor: Colors.green[50]!,
-                  darkModeColor: Colors.green[900]!,
-                  children: [
-                    _buildParticipantsList(_tripData!.participants),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                AnimatedExpansionTile(
-                  title: 'Day Plans',
-                  icon: Icons.calendar_today,
-                  lightModeColor: Colors.orange[50]!,
-                  darkModeColor: Colors.orange[900]!,
-                  children: [
-                    _buildDayPlansList(),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                AnimatedExpansionTile(
-                  title: 'Expenses',
-                  icon: Icons.attach_money,
-                  lightModeColor: Colors.purple[50]!,
-                  darkModeColor: Colors.purple[900]!,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pushNamed(
-                            context,
-                            Routes.tripExpenseDashboard,
-                            arguments: _tripData,
-                          );
-                        },
-                        child: const Text('View Expenses Dashboard'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              _buildDateHeader(_tripData!),
+            ],
           ),
-        ],
-      ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.all(16.0),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              AnimatedExpansionTile(
+                title: 'Description',
+                icon: Icons.description,
+                lightModeColor: Colors.blue[50]!,
+                darkModeColor: Colors.blue[900]!,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      _tripData!.description,
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              AnimatedExpansionTile(
+                title: 'Participants',
+                icon: Icons.people,
+                lightModeColor: Colors.green[50]!,
+                darkModeColor: Colors.green[900]!,
+                children: [
+                  _buildParticipantsList(_tripData!.participants),
+                ],
+              ),
+              const SizedBox(height: 8),
+              AnimatedExpansionTile(
+                title: 'Day Plans',
+                icon: Icons.calendar_today,
+                lightModeColor: Colors.orange[50]!,
+                darkModeColor: Colors.orange[900]!,
+                children: [
+                  _buildDayPlansList(),
+                ],
+              ),
+              const SizedBox(height: 8),
+              AnimatedExpansionTile(
+                title: 'Expenses',
+                icon: Icons.attach_money,
+                lightModeColor: Colors.purple[50]!,
+                darkModeColor: Colors.purple[900]!,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushNamed(
+                          context,
+                          Routes.tripExpenseDashboard,
+                          arguments: _tripData,
+                        );
+                      },
+                      child: const Text('View Expenses Dashboard'),
+                    ),
+                  ),
+                ],
+              ),
+            ]),
+          ),
+        ),
+      ],
     );
   }
 
@@ -731,8 +741,13 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             builder: (context) => EditTripScreen(trip: _tripData!),
           ),
         );
+
         if (updatedTrip != null) {
-          _loadTripData(); // Refresh the trip data
+          setState(() {
+            _tripData = updatedTrip;
+          });
+
+          await _refreshTripData(); // Refresh the trip data
         }
         break;
       case 'archive':
@@ -748,11 +763,11 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     try {
       await getIt<TripService>()
           .toggleArchiveTrip(widget.tripId, !_tripData!.isArchived);
+      await _refreshTripData();
       SnackbarUtil.showSnackbar(
         'Trip ${_tripData!.isArchived ? 'unarchived' : 'archived'} successfully',
         type: SnackbarType.success,
       );
-      _loadTripData(); // Refresh the trip data
     } catch (e) {
       SnackbarUtil.showSnackbar(
         'Failed to ${_tripData!.isArchived ? 'unarchive' : 'archive'} trip: ${e.toString()}',

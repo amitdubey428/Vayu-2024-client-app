@@ -13,6 +13,8 @@ import 'package:vayu_flutter_app/core/utils/globals.dart';
 
 import 'dart:developer' as developer;
 
+import 'package:vayu_flutter_app/services/user_device.dart';
+
 /// AuthNotifier handles authentication related tasks and state management.
 class AuthNotifier extends ChangeNotifier {
   final FirebaseAuth _auth;
@@ -35,6 +37,14 @@ class AuthNotifier extends ChangeNotifier {
   }
 
   Stream<User?> authStateChanges() => _auth.authStateChanges();
+
+  Future<void> registerDevice() async {
+    try {
+      await registerUserDevice();
+    } catch (e) {
+      developer.log('Error registering device: $e', name: 'auth');
+    }
+  }
 
   Future<void> _onAuthStateChanged(User? firebaseUser) async {
     if (firebaseUser == null) {
@@ -64,6 +74,7 @@ class AuthNotifier extends ChangeNotifier {
         fullName,
       );
       _userModel = newUser;
+      await registerDevice();
       notifyListeners();
       return "success";
     } catch (e) {
@@ -106,6 +117,7 @@ class AuthNotifier extends ChangeNotifier {
       await updateLastLogin();
       try {
         _userModel = await _userRepository.getCurrentUser();
+        await registerDevice();
       } catch (e) {
         developer.log('Error fetching user data: $e');
       }
@@ -287,6 +299,7 @@ class AuthNotifier extends ChangeNotifier {
         smsCode: smsCode,
       );
       await _auth.signInWithCredential(credential);
+      await registerDevice();
       return "success";
     } catch (e) {
       developer.log('Error signing in with OTP: $e');

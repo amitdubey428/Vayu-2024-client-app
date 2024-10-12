@@ -61,10 +61,6 @@ class ApiService {
           response = await httpClient.get(uri, headers: fullHeaders);
           break;
         case 'POST':
-          developer.log('POST Request to: $uri', name: 'api_service');
-          developer.log('POST Request headers: $fullHeaders',
-              name: 'api_service');
-          developer.log('POST Request body: $jsonBody', name: 'api_service');
           response =
               await httpClient.post(uri, headers: fullHeaders, body: jsonBody);
           developer.log('POST Request response: ${response.body}',
@@ -351,5 +347,21 @@ class ApiService {
 
     var response = await request.send();
     return await http.Response.fromStream(response);
+  }
+
+  Future<void> registerUserDevice(Map<String, dynamic> deviceData) async {
+    try {
+      final response = await post(
+        '/users/register-device',
+        body: deviceData,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to register device: ${response.statusCode}');
+      }
+    } catch (e) {
+      developer.log('Error registering device: $e', name: 'api_service');
+      rethrow;
+    }
   }
 }
