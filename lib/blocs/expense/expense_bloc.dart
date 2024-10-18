@@ -26,6 +26,17 @@ class DeleteExpense extends ExpenseEvent {
   DeleteExpense(this.expenseId, this.tripId);
 }
 
+class PredictExpenseCategory extends ExpenseEvent {
+  final String description;
+  PredictExpenseCategory(this.description);
+}
+
+class UpdateExpenseCategory extends ExpenseEvent {
+  final int expenseId;
+  final String category;
+  UpdateExpenseCategory(this.expenseId, this.category);
+}
+
 // Define states
 abstract class ExpenseState {}
 
@@ -55,28 +66,41 @@ class ExpenseUpdated extends ExpenseState {
   ExpenseUpdated(this.expense);
 }
 
+class ExpenseCategoryPredicted extends ExpenseState {
+  final String category;
+  final double confidence;
+  ExpenseCategoryPredicted(this.category, this.confidence);
+}
+
+class ExpenseCategoryUpdated extends ExpenseState {}
+
 class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
   final ExpenseRepository _expenseRepository;
 
   ExpenseBloc(this._expenseRepository) : super(ExpenseInitial()) {
     on<LoadExpenses>(_onLoadExpenses);
-    on<AddExpense>((event, emit) async {
-      emit(ExpenseLoading());
-      try {
-        await _expenseRepository.addExpense(event.expense);
-        final response =
-            await _expenseRepository.getExpenses(event.expense.tripId);
-        emit(ExpensesLoaded(
-          summary: response.summary,
-          page: response.page,
-          perPage: response.perPage,
-        ));
-      } catch (e) {
-        emit(ExpenseError(e.toString()));
-      }
-    });
+    on<AddExpense>(_onAddExpense);
     on<UpdateExpense>(_onUpdateExpense);
     on<DeleteExpense>(_onDeleteExpense);
+    on<PredictExpenseCategory>(_onPredictExpenseCategory);
+    on<UpdateExpenseCategory>(_onUpdateExpenseCategory);
+  }
+
+  Future<void> _onAddExpense(
+      AddExpense event, Emitter<ExpenseState> emit) async {
+    emit(ExpenseLoading());
+    try {
+      await _expenseRepository.addExpense(event.expense);
+      final response =
+          await _expenseRepository.getExpenses(event.expense.tripId);
+      emit(ExpensesLoaded(
+        summary: response.summary,
+        page: response.page,
+        perPage: response.perPage,
+      ));
+    } catch (e) {
+      emit(ExpenseError(e.toString()));
+    }
   }
 
   Future<void> _onLoadExpenses(
@@ -127,6 +151,35 @@ class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
       ));
     } catch (e) {
       emit(ExpenseError('Failed to delete expense: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onPredictExpenseCategory(
+    PredictExpenseCategory event,
+    Emitter<ExpenseState> emit,
+  ) async {
+    emit(ExpenseLoading());
+    try {
+      final prediction =
+          await _expenseRepository.predictCategory(event.description);
+      emit(
+          ExpenseCategoryPredicted(prediction.category, prediction.confidence));
+    } catch (e) {
+      emit(ExpenseError(e.toString()));
+    }
+  }
+
+  Future<void> _onUpdateExpenseCategory(
+    UpdateExpenseCategory event,
+    Emitter<ExpenseState> emit,
+  ) async {
+    emit(ExpenseLoading());
+    try {
+      await _expenseRepository.updateExpenseCategory(
+          event.expenseId, event.category);
+      emit(ExpenseCategoryUpdated());
+    } catch (e) {
+      emit(ExpenseError(e.toString()));
     }
   }
 }

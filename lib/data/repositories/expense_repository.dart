@@ -25,4 +25,12 @@ class ExpenseRepository {
   Future<void> deleteExpense(int expenseId) async {
     await _expenseService.deleteExpense(expenseId);
   }
+
+  Future<CategoryPrediction> predictCategory(String description) async {
+    return await _expenseService.predictCategory(description);
+  }
+
+  Future<void> updateExpenseCategory(int expenseId, String category) async {
+    await _expenseService.updateExpenseCategory(expenseId, category);
+  }
 }

@@ -17,7 +17,6 @@ import 'package:vayu_flutter_app/shared/utils/location_utils.dart';
 import 'package:vayu_flutter_app/shared/widgets/qr_code_generator.dart';
 import 'package:vayu_flutter_app/shared/widgets/snackbar_util.dart';
 import 'package:vayu_flutter_app/shared/widgets/custom_loading_indicator.dart';
-import 'dart:developer' as developer;
 
 class TripDetailScreen extends StatefulWidget {
   final int tripId;

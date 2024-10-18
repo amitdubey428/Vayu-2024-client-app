@@ -106,6 +106,7 @@ class ExpenseModel extends Equatable {
   final int tripId;
   final double amount;
   final String description;
+  final String category;
   final String currency;
   final int createdBy;
   final DateTime createdAt;
@@ -116,12 +117,14 @@ class ExpenseModel extends Equatable {
   final bool isIndependent;
   final String status;
   final String? notes;
+  final DateTime transactionDate;
 
   const ExpenseModel({
     this.expenseId,
     required this.tripId,
     required this.amount,
     required this.description,
+    required this.category,
     required this.currency,
     required this.createdBy,
     required this.createdAt,
@@ -132,6 +135,7 @@ class ExpenseModel extends Equatable {
     this.isIndependent = false,
     required this.status,
     this.notes,
+    required this.transactionDate,
   });
 
   factory ExpenseModel.fromJson(Map<String, dynamic> json) {
@@ -148,6 +152,7 @@ class ExpenseModel extends Equatable {
                   : json['total_amount'].toDouble())
               : 0.0,
       description: json['description'],
+      category: json['category'],
       currency: json['currency'],
       createdBy: json['created_by'],
       createdAt: DateTime.parse(
@@ -166,6 +171,7 @@ class ExpenseModel extends Equatable {
       isIndependent: json['is_independent'] ?? false,
       status: json['status'] as String,
       notes: json['notes'],
+      transactionDate: DateTime.parse(json['transaction_date']),
     );
   }
 
@@ -175,6 +181,7 @@ class ExpenseModel extends Equatable {
       'trip_id': tripId,
       'amount': amount,
       'description': description,
+      'category': category,
       'currency': currency,
       'created_by': createdBy,
       'created_at': createdAt.toIso8601String(),
@@ -184,6 +191,7 @@ class ExpenseModel extends Equatable {
       'payments': payments.map((p) => p.toJson()).toList(),
       'is_independent': isIndependent,
       'notes': notes,
+      'transaction_date': transactionDate.toIso8601String(),
     };
   }
 
@@ -192,6 +200,7 @@ class ExpenseModel extends Equatable {
     int? tripId,
     double? amount,
     String? description,
+    String? category,
     String? currency,
     int? createdBy,
     DateTime? createdAt,
@@ -202,12 +211,14 @@ class ExpenseModel extends Equatable {
     bool? isIndependent,
     String? status,
     String? notes,
+    DateTime? transactionDate,
   }) {
     return ExpenseModel(
       expenseId: expenseId ?? this.expenseId,
       tripId: tripId ?? this.tripId,
       amount: amount ?? this.amount,
       description: description ?? this.description,
+      category: category ?? this.category,
       currency: currency ?? this.currency,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
@@ -218,6 +229,7 @@ class ExpenseModel extends Equatable {
       splitMethod: splitMethod ?? this.splitMethod,
       status: status ?? this.status,
       notes: notes ?? this.notes,
+      transactionDate: transactionDate ?? this.transactionDate,
     );
   }
 
@@ -227,6 +239,7 @@ class ExpenseModel extends Equatable {
         tripId,
         amount,
         description,
+        category,
         currency,
         createdBy,
         createdAt,
@@ -237,6 +250,7 @@ class ExpenseModel extends Equatable {
         splitMethod,
         status,
         notes,
+        transactionDate,
       ];
 }
 
@@ -299,4 +313,18 @@ class ExpensePayment extends Equatable {
 
   @override
   List<Object?> get props => [userId, amountPaid];
+}
+
+class CategoryPrediction {
+  final String category;
+  final double confidence;
+
+  CategoryPrediction({required this.category, required this.confidence});
+
+  factory CategoryPrediction.fromJson(Map<String, dynamic> json) {
+    return CategoryPrediction(
+      category: json['category'],
+      confidence: json['confidence'].toDouble(),
+    );
+  }
 }

@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:vayu_flutter_app/blocs/expense/expense_bloc.dart';
+import 'package:vayu_flutter_app/core/themes/app_theme.dart';
 import 'package:vayu_flutter_app/data/models/expense_model.dart';
 import 'package:vayu_flutter_app/data/models/user_public_info.dart';
 import 'package:vayu_flutter_app/features/expenses/widgets/split_details_view.dart';
@@ -32,7 +36,7 @@ class AddEditExpenseScreen extends StatefulWidget {
 
 class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _descriptionController;
+  late TextEditingController _titleController;
   late TextEditingController _amountController;
   late TextEditingController _currencyController;
   late Map<int, double> _paidBy;
@@ -51,8 +55,30 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
     'CNY',
     'INR'
   ];
-
   bool _isFormChanged = false;
+  late TextEditingController _categoryController;
+  IconData _categoryIcon = Icons.category;
+  final List<String> allCategories = [
+    'Food',
+    'Transportation',
+    'Accommodation',
+    'Entertainment',
+    'Shopping',
+    'Health',
+    'Education',
+    'Utilities',
+    'Personal',
+    'Gifts',
+    'Travel',
+    'Business',
+    'Investments',
+    'Bills',
+    'Subscriptions',
+    'Other'
+  ];
+  Timer? _debounce;
+  late DateTime _transactionDate;
+  bool _formSubmitted = false;
 
   String getCurrencyCode(String currencyCode) {
     return currencyCode;
@@ -61,7 +87,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
   @override
   void initState() {
     super.initState();
-    _descriptionController =
+    _titleController =
         TextEditingController(text: widget.expense?.description ?? '');
     _amountController =
         TextEditingController(text: widget.expense?.amount.toString() ?? '');
@@ -73,18 +99,22 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
         widget.tripParticipants.map((p) => p.userId).toSet();
     _splitMethod = SplitMethod.equal;
     _notesController = TextEditingController(text: widget.expense?.notes ?? '');
+    _categoryController =
+        TextEditingController(text: widget.expense?.category ?? '');
 
     if (widget.expense != null) {
       _splitMethod = SplitMethod.unequal;
       _splits = Map.fromEntries(widget.expense!.splits
           .map((split) => MapEntry(split.userId, split.amount ?? 0.0)));
     }
+    _transactionDate = widget.expense?.transactionDate ?? DateTime.now();
 
     // Add listeners to all controllers to detect changes
-    _descriptionController.addListener(_onFormChanged);
+    _titleController.addListener(_onFormChanged);
     _amountController.addListener(_onFormChanged);
     _currencyController.addListener(_onFormChanged);
     _notesController.addListener(_onFormChanged);
+    _categoryController.addListener(_onFormChanged);
   }
 
   void _onFormChanged() {
@@ -107,6 +137,33 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
     }
   }
 
+  String? _validateField(String? value, String fieldName) {
+    if (!_formSubmitted) return null;
+
+    if (value == null || value.isEmpty) {
+      return 'Please enter $fieldName';
+    }
+    if (fieldName == 'Title' && value.length < 3) {
+      return '$fieldName must be at least 3 characters long';
+    }
+    return null;
+  }
+
+  String? _validateAmount(String? value) {
+    if (!_formSubmitted) return null;
+
+    if (value == null || value.isEmpty) {
+      return 'Please enter an amount';
+    }
+    if (double.tryParse(value) == null) {
+      return 'Please enter a valid number';
+    }
+    if (double.parse(value) <= 0) {
+      return 'Amount must be greater than zero';
+    }
+    return null;
+  }
+
   void _initializeSplits() {
     if (widget.expense != null) {
       _splits = {
@@ -124,13 +181,56 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
     }
   }
 
+  Widget _buildDatePicker() {
+    return InkWell(
+      onTap: () async {
+        final DateTime? picked = await showDatePicker(
+          context: context,
+          initialDate: _transactionDate,
+          firstDate: DateTime(2000),
+          lastDate: DateTime.now(),
+          builder: (BuildContext context, Widget? child) {
+            return Theme(
+              data: ThemeData.light().copyWith(
+                primaryColor: AppTheme.primaryColor,
+                colorScheme:
+                    const ColorScheme.light(primary: AppTheme.primaryColor),
+                buttonTheme:
+                    const ButtonThemeData(textTheme: ButtonTextTheme.primary),
+              ),
+              child: child!,
+            );
+          },
+        );
+        if (picked != null && picked != _transactionDate) {
+          setState(() {
+            _transactionDate = picked;
+          });
+        }
+      },
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Transaction Date',
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            Text(DateFormat('MMM dd, yyyy').format(_transactionDate)),
+            const Icon(Icons.calendar_today, color: AppTheme.primaryColor),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
-    _descriptionController.removeListener(_onFormChanged);
+    _titleController.removeListener(_onFormChanged);
     _amountController.removeListener(_onFormChanged);
     _currencyController.removeListener(_onFormChanged);
     _notesController.removeListener(_onFormChanged);
-    _descriptionController.dispose();
+    _titleController.dispose();
     _amountController.dispose();
     _currencyController.dispose();
     _notesController.dispose();
@@ -266,7 +366,6 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
               onPressed: () {
                 setState(() {
                   _paidBy.remove(entry.key);
-                  _recalculatePaidBy(); // Add this method to redistribute the amount
                 });
               },
             ),
@@ -274,17 +373,6 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
         ),
       );
     }).toList();
-  }
-
-  void _recalculatePaidBy() {
-    double totalAmount = double.tryParse(_amountController.text) ?? 0;
-    double currentTotal = _paidBy.values.fold(0, (sum, amount) => sum + amount);
-
-    if (_paidBy.isNotEmpty && currentTotal < totalAmount) {
-      double remaining = totalAmount - currentTotal;
-      int lastKey = _paidBy.keys.last;
-      _paidBy[lastKey] = (_paidBy[lastKey] ?? 0) + remaining;
-    }
   }
 
   void _addPayer() {
@@ -323,14 +411,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
               onPressed: () {
                 if (selectedUserId != null) {
                   setState(() {
-                    double totalAmount =
-                        double.tryParse(_amountController.text) ?? 0;
-                    double currentTotal =
-                        _paidBy.values.fold(0, (sum, amount) => sum + amount);
-                    double remainingAmount = totalAmount - currentTotal;
-                    _paidBy[selectedUserId!] =
-                        remainingAmount > 0 ? remainingAmount : 0;
-                    _recalculatePaidBy();
+                    _paidBy[selectedUserId!] = 0;
                   });
                   Navigator.of(context).pop();
                 }
@@ -453,8 +534,29 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
 
   double _remainingToSplit() {
     double totalAmount = double.tryParse(_amountController.text) ?? 0;
-    double splitAmount =
-        _splits.values.fold(0, (sum, amount) => sum + (amount));
+    double splitAmount = 0;
+
+    switch (_splitMethod) {
+      case SplitMethod.equal:
+      case SplitMethod.unequal:
+        splitAmount = _splits.values.fold(0, (sum, amount) => sum + amount);
+        break;
+      case SplitMethod.percentage:
+        splitAmount = _splits.values.fold(0, (sum, percentage) {
+          return sum + (totalAmount * percentage / 100);
+        });
+        break;
+      case SplitMethod.shares:
+        int totalShares =
+            _splits.values.fold(0, (sum, shares) => sum + shares.round());
+        if (totalShares > 0) {
+          splitAmount = _splits.values.fold(0, (sum, shares) {
+            return sum + (totalAmount * shares / totalShares);
+          });
+        }
+        break;
+    }
+
     return totalAmount - splitAmount;
   }
 
@@ -549,6 +651,9 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
   }
 
   void _saveExpense() {
+    setState(() {
+      _formSubmitted = true;
+    });
     if (_formKey.currentState!.validate()) {
       final expenseBloc = context.read<ExpenseBloc>();
       final authNotifier = context.read<AuthNotifier>();
@@ -596,7 +701,8 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
         expenseId: widget.expense?.expenseId,
         tripId: widget.tripId,
         amount: totalAmount,
-        description: _descriptionController.text,
+        description: _titleController.text,
+        category: _categoryController.text,
         currency: _currencyController.text,
         createdBy: authNotifier.postgresUserId!,
         createdAt: widget.expense?.createdAt ?? DateTime.now(),
@@ -607,6 +713,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
         isIndependent: false,
         status: 'pending',
         notes: _notesController.text.isNotEmpty ? _notesController.text : null,
+        transactionDate: _transactionDate,
       );
 
       if (widget.expense == null) {
@@ -614,6 +721,13 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
       } else {
         expenseBloc.add(UpdateExpense(expense));
       }
+    } else {
+      // If validation fails, scroll to the top of the form to show errors
+      Scrollable.ensureVisible(
+        _formKey.currentContext!,
+        alignment: 0.0,
+        duration: const Duration(milliseconds: 300),
+      );
     }
   }
 
@@ -626,18 +740,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
       ],
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Please enter an amount';
-        }
-        if (double.tryParse(value) == null) {
-          return 'Please enter a valid number';
-        }
-        if (double.parse(value) <= 0) {
-          return 'Amount must be greater than zero';
-        }
-        return null;
-      },
+      validator: _validateAmount,
       onTap: () {
         _amountController.selection = TextSelection(
           baseOffset: 0,
@@ -711,12 +814,28 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
     );
   }
 
+  void _updateCategory(String title) {
+    final expenseBloc = context.read<ExpenseBloc>();
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (title.length > 3) {
+        expenseBloc.add(PredictExpenseCategory(title));
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: widget.expenseBloc,
       child: BlocConsumer<ExpenseBloc, ExpenseState>(
         listener: (context, state) {
+          if (state is ExpenseCategoryPredicted) {
+            setState(() {
+              _categoryIcon = _getCategoryIcon(state.category);
+              _categoryController.text = state.category;
+            });
+          }
           if (state is ExpensesLoaded) {
             SnackbarUtil.showSnackbar(
               widget.expense == null
@@ -746,19 +865,18 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         CustomTextFormField(
-                          controller: _descriptionController,
-                          labelText: 'Description',
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter a description';
-                            }
-                            if (value.length < 3) {
-                              return 'Description must be at least 3 characters long';
-                            }
-                            return null;
-                          },
-                          hintText: 'Enter the description of the expense',
+                          controller: _titleController,
+                          labelText: 'Title',
+                          onChanged: _updateCategory,
+                          prefixIcon: GestureDetector(
+                            onTap: _showCategorySelectionDialog,
+                            child: Icon(_categoryIcon),
+                          ),
+                          validator: (value) => _validateField(value, 'Title'),
+                          hintText: 'Enter the Title of the expense',
                         ),
+                        const SizedBox(height: 16),
+                        _buildDatePicker(),
                         const SizedBox(height: 16),
                         _buildAmountField(),
                         const SizedBox(height: 16),
@@ -834,6 +952,75 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
         },
       ),
     );
+  }
+
+  void _showCategorySelectionDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Select Category'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: allCategories.map((String category) {
+                return ListTile(
+                  leading: Icon(_getCategoryIcon(category)),
+                  title: Text(category),
+                  onTap: () {
+                    setState(() {
+                      _categoryController.text = category;
+                      _categoryIcon = _getCategoryIcon(category);
+                    });
+                    Navigator.of(context).pop();
+                    if (widget.expense != null) {
+                      context.read<ExpenseBloc>().add(UpdateExpenseCategory(
+                          widget.expense!.expenseId!, category));
+                    }
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
+        return Icons.restaurant;
+      case 'transportation':
+        return Icons.directions_car;
+      case 'accommodation':
+        return Icons.hotel;
+      case 'entertainment':
+        return Icons.movie;
+      case 'shopping':
+        return Icons.shopping_cart;
+      case 'health':
+        return Icons.local_hospital;
+      case 'education':
+        return Icons.school;
+      case 'utilities':
+        return Icons.flash_on;
+      case 'personal':
+        return Icons.person;
+      case 'gifts':
+        return Icons.card_giftcard;
+      case 'travel':
+        return Icons.flight;
+      case 'business':
+        return Icons.business;
+      case 'investments':
+        return Icons.trending_up;
+      case 'bills':
+        return Icons.receipt;
+      case 'subscriptions':
+        return Icons.subscriptions;
+      default:
+        return Icons.category;
+    }
   }
 }
 

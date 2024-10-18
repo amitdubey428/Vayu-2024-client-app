@@ -170,7 +170,7 @@ class _ExpenseDetailsScreenState extends State<ExpenseDetailsScreen> {
         children: [
           _buildInfoCard(context, 'Expense Details', [
             _buildInfoRow('Created by', _getUserName(_expense.createdBy)),
-            _buildInfoRow('Category', 'Not specified'),
+            _buildInfoRow('Category', _expense.category),
             if (_expense.notes != null && _expense.notes!.isNotEmpty)
               _buildNotesSection(context),
           ]),

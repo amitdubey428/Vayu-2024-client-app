@@ -44,6 +44,33 @@ class _TripExpenseDashboardContentState
   DateTime? _startDate;
   DateTime? _endDate;
   bool _isAscending = false;
+  final Set<String> _selectedCategories = {};
+  List<String> _categories = [];
+  bool _categoriesLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCategories();
+    });
+  }
+
+  void _loadCategories() {
+    final state = context.read<ExpenseBloc>().state;
+    if (state is ExpensesLoaded) {
+      _populateCategories(state.summary.expenses);
+    }
+  }
+
+  void _populateCategories(List<ExpenseModel> expenses) {
+    Set<String> categorySet = {};
+    for (var expense in expenses) {
+      categorySet.add(expense.category);
+    }
+    _categories = categorySet.toList()..sort();
+    _categoriesLoaded = true;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +94,9 @@ class _TripExpenseDashboardContentState
       ),
       body: BlocConsumer<ExpenseBloc, ExpenseState>(
         listener: (context, state) {
-          if (state is ExpenseError) {
+          if (state is ExpensesLoaded) {
+            _populateCategories(state.summary.expenses);
+          } else if (state is ExpenseError) {
             SnackbarUtil.showSnackbar(state.message, type: SnackbarType.error);
           }
         },
@@ -139,20 +168,63 @@ class _TripExpenseDashboardContentState
   Widget _buildFilterOptions(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ElevatedButton.icon(
-            onPressed: () => _showDateFilterDialog(context),
-            icon: const Icon(Icons.filter_list),
-            label: const Text('Filter'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => _showDateFilterDialog(context),
+                icon: const Icon(Icons.filter_list),
+                label: const Text('Date Filter'),
+              ),
+              ElevatedButton.icon(
+                onPressed: _toggleSortOrder,
+                icon: Icon(
+                    _isAscending ? Icons.arrow_upward : Icons.arrow_downward),
+                label: Text(_isAscending ? 'Oldest First' : 'Newest First'),
+              ),
+            ],
           ),
-          ElevatedButton.icon(
-            onPressed: _toggleSortOrder,
-            icon:
-                Icon(_isAscending ? Icons.arrow_upward : Icons.arrow_downward),
-            label: Text(_isAscending ? 'Oldest First' : 'Newest First'),
-          ),
+          const SizedBox(height: 16),
+          Text('Filter by Categories:',
+              style: Theme.of(context).textTheme.labelMedium),
+          const SizedBox(height: 8),
+          if (_categoriesLoaded)
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: _categories.map((category) {
+                return FilterChip(
+                  label: Text(category),
+                  selected: _selectedCategories.contains(category),
+                  onSelected: (bool selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedCategories.add(category);
+                      } else {
+                        _selectedCategories.remove(category);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            )
+          else
+            const CustomLoadingIndicator(message: "Loading..."),
+          if (_selectedCategories.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedCategories.clear();
+                  });
+                },
+                child: const Text('Clear Category Filters'),
+              ),
+            ),
         ],
       ),
     );
@@ -183,6 +255,9 @@ class _TripExpenseDashboardContentState
   Widget _buildExpenseList(BuildContext context, List<ExpenseModel> expenses) {
     final currentUserId = context.read<AuthNotifier>().postgresUserId;
 
+    // Populate categories
+    _populateCategories(expenses);
+
     // Apply date filters
     List<ExpenseModel> filteredExpenses = expenses;
     if (_startDate != null) {
@@ -196,11 +271,16 @@ class _TripExpenseDashboardContentState
               e.createdAt.isBefore(_endDate!.add(const Duration(days: 1))))
           .toList();
     }
+    if (_selectedCategories.isNotEmpty) {
+      filteredExpenses = filteredExpenses
+          .where((e) => _selectedCategories.contains(e.category))
+          .toList();
+    }
 
     // Sort expenses
     filteredExpenses.sort((a, b) => _isAscending
-        ? a.createdAt.compareTo(b.createdAt)
-        : b.createdAt.compareTo(a.createdAt));
+        ? a.transactionDate.compareTo(b.transactionDate)
+        : b.transactionDate.compareTo(a.transactionDate));
 
     // Group expenses by date
     final groupedExpenses = groupExpensesByDate(filteredExpenses);
@@ -241,8 +321,8 @@ class _TripExpenseDashboardContentState
       List<ExpenseModel> expenses) {
     final groupedExpenses = <DateTime, List<ExpenseModel>>{};
     for (final expense in expenses) {
-      final date = DateTime(expense.createdAt.year, expense.createdAt.month,
-          expense.createdAt.day);
+      final date = DateTime(expense.transactionDate.year,
+          expense.transactionDate.month, expense.transactionDate.day);
       if (!groupedExpenses.containsKey(date)) {
         groupedExpenses[date] = [];
       }

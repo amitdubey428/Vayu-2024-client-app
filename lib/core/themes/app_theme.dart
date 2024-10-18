@@ -113,6 +113,8 @@ class AppTheme {
       fillColor: Colors.grey[800],
       hintStyle: TextStyle(color: Colors.grey[400]),
       labelStyle: TextStyle(color: Colors.grey[300]),
+      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      isCollapsed: true,
       prefixStyle: const TextStyle(color: textLight),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(

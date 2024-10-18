@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:provider/provider.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
@@ -32,6 +34,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     super.initState();
     _authNotifier = Provider.of<AuthNotifier>(context, listen: false);
     _initializeAuthState();
+    _setDefaultCountryCode();
   }
 
   void _initializeAuthState() {
@@ -103,30 +106,56 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                     if (!_isOtpSent) ...[
                       Container(
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
+                          color:
+                              Theme.of(context).inputDecorationTheme.fillColor,
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Theme.of(context)
+                                    .inputDecorationTheme
+                                    .border
+                                    ?.borderSide
+                                    .color ??
+                                Colors.grey,
+                          ),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: InternationalPhoneNumberInput(
-                            onInputChanged: (PhoneNumber number) {
-                              _phoneNumber = number;
-                            },
-                            selectorConfig: const SelectorConfig(
-                              selectorType: PhoneInputSelectorType.BOTTOM_SHEET,
-                            ),
-                            ignoreBlank: false,
-                            autoValidateMode: AutovalidateMode.disabled,
-                            selectorTextStyle:
-                                const TextStyle(color: Colors.black),
-                            textFieldController: _phoneController,
-                            formatInput: true,
-                            keyboardType: const TextInputType.numberWithOptions(
-                                signed: true, decimal: true),
-                            inputDecoration: InputDecoration(
-                              hintText: "Phone Number",
-                              border: InputBorder.none,
-                              hintStyle: TextStyle(color: Colors.grey[400]),
+                          child: SizedBox(
+                            height: 60,
+                            child: InternationalPhoneNumberInput(
+                              onInputChanged: (PhoneNumber number) {
+                                setState(() {
+                                  _phoneNumber = number;
+                                });
+                              },
+                              selectorConfig: const SelectorConfig(
+                                selectorType:
+                                    PhoneInputSelectorType.BOTTOM_SHEET,
+                              ),
+                              ignoreBlank: false,
+                              autoValidateMode: AutovalidateMode.disabled,
+                              selectorTextStyle:
+                                  const TextStyle(color: Colors.black),
+                              textFieldController: _phoneController,
+                              formatInput: true,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      signed: true, decimal: true),
+                              inputDecoration: InputDecoration(
+                                hintText: "Phone Number",
+                                border: InputBorder.none,
+                                hintStyle: TextStyle(
+                                    color: Theme.of(context).hintColor),
+                                fillColor: Colors.transparent,
+                              ),
+                              textStyle: TextStyle(
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.color,
+                                height: 1.5,
+                              ),
+                              initialValue: _phoneNumber,
                             ),
                           ),
                         ),
@@ -137,11 +166,10 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                         hintText: "Enter OTP",
                         keyboardType: TextInputType.number,
                         labelText: 'Enter OTP',
-                          style: TextStyle(
+                        style: TextStyle(
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSurface), // Add this line
-
                       ),
                       if (!_isExistingUser) ...[
                         const SizedBox(height: 16),
@@ -223,12 +251,51 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      SnackbarUtil.showSnackbar("An error occurred: ${e.toString()}",
-          type: SnackbarType.error);
+      if (e is RangeError) {
+        SnackbarUtil.showSnackbar(
+            "Invalid phone number for the selected country",
+            type: SnackbarType.error);
+      } else {
+        SnackbarUtil.showSnackbar("An error occurred: ${e.toString()}",
+            type: SnackbarType.error);
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _setDefaultCountryCode() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          return;
+        }
+      }
+
+      Position position = await Geolocator.getCurrentPosition();
+      List<Placemark> placemarks =
+          await placemarkFromCoordinates(position.latitude, position.longitude);
+
+      if (placemarks.isNotEmpty) {
+        String? countryCode = placemarks.first.isoCountryCode;
+        // developer.log(countryCode);
+        if (countryCode != null) {
+          setState(() {
+            _phoneNumber = PhoneNumber(isoCode: countryCode);
+          });
+        }
+      }
+    } catch (e) {
+      // Handle any errors silently
     }
   }
 

@@ -30,4 +30,15 @@ class ExpenseService {
   Future<void> deleteExpense(int expenseId) async {
     await _apiService.delete('/expenses/$expenseId');
   }
+
+  Future<CategoryPrediction> predictCategory(String description) async {
+    final response = await _apiService
+        .post('/expenses/predict-category', body: {'description': description});
+    return CategoryPrediction.fromJson(json.decode(response.body));
+  }
+
+  Future<void> updateExpenseCategory(int expenseId, String category) async {
+    await _apiService
+        .put('/expenses/$expenseId/category', body: {'category': category});
+  }
 }

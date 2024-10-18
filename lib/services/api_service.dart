@@ -61,6 +61,7 @@ class ApiService {
           response = await httpClient.get(uri, headers: fullHeaders);
           break;
         case 'POST':
+          developer.log(body.toString());
           response =
               await httpClient.post(uri, headers: fullHeaders, body: jsonBody);
           developer.log('POST Request response: ${response.body}',
