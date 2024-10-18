@@ -28,7 +28,10 @@ class ApiService {
     bool requiresAuth = true,
   }) async {
     try {
-      final Map<String, String> fullHeaders = {...?headers};
+      final Map<String, String> fullHeaders = {
+        'Content-Type': 'application/json',
+        ...?headers
+      };
 
       if (requiresAuth) {
         final token = await getToken();
@@ -38,22 +41,39 @@ class ApiService {
 
       final uri = Uri.parse('$baseUrl$endpoint');
       http.Response response;
+      // Prepare the body
+      dynamic jsonBody;
+      if (body is String) {
+        // If body is already a JSON string, use it as is
+        jsonBody = body;
+      } else if (body is Map) {
+        // If body is a Map, remove null values and encode to JSON
+        jsonBody = json.encode(Map.fromEntries((body as Map<String, dynamic>)
+            .entries
+            .where((entry) => entry.value != null)));
+      } else {
+        // For other types, encode as is
+        jsonBody = json.encode(body);
+      }
 
       switch (method) {
         case 'GET':
           response = await httpClient.get(uri, headers: fullHeaders);
           break;
         case 'POST':
+          developer.log(body.toString());
           response =
-              await httpClient.post(uri, headers: fullHeaders, body: body);
-          break;
-        case 'PATCH':
-          response =
-              await httpClient.patch(uri, headers: fullHeaders, body: body);
+              await httpClient.post(uri, headers: fullHeaders, body: jsonBody);
+          developer.log('POST Request response: ${response.body}',
+              name: 'api_service');
           break;
         case 'PUT':
           response =
-              await httpClient.put(uri, headers: fullHeaders, body: body);
+              await httpClient.put(uri, headers: fullHeaders, body: jsonBody);
+          break;
+        case 'PATCH':
+          response =
+              await httpClient.patch(uri, headers: fullHeaders, body: jsonBody);
           break;
         case 'DELETE':
           response = await httpClient.delete(uri, headers: fullHeaders);
@@ -74,18 +94,25 @@ class ApiService {
               break;
             case 'POST':
               response = await httpClient.post(redirectUri,
-                  headers: fullHeaders, body: body);
+                  headers: fullHeaders, body: jsonBody);
+              developer.log(
+                  'Redirected POST Request response: ${response.body}',
+                  name: 'api_service');
+              developer.log(
+                  'Redirected POST Request status code: ${response.statusCode}',
+                  name: 'api_service');
               break;
             case 'PUT':
               response = await httpClient.put(redirectUri,
-                  headers: fullHeaders, body: body);
+                  headers: fullHeaders, body: jsonBody);
               break;
             case 'PATCH':
               response = await httpClient.patch(redirectUri,
-                  headers: fullHeaders, body: body);
+                  headers: fullHeaders, body: jsonBody);
               break;
             case 'DELETE':
-              response = await httpClient.delete(uri, headers: fullHeaders);
+              response =
+                  await httpClient.delete(redirectUri, headers: fullHeaders);
               break;
           }
         }
@@ -98,6 +125,8 @@ class ApiService {
       throw ApiException('Request timed out');
     } catch (e) {
       developer.log('API Error: $e', name: 'api_service');
+      developer.log('Request body: $body');
+
       rethrow;
     }
   }
@@ -178,6 +207,7 @@ class ApiService {
       'Authorization': 'Bearer $token',
     };
     final body = jsonEncode(userDetails);
+    developer.log('Creating user with details: $userDetails');
 
     final response =
         await post('/users/create_user', headers: headers, body: body);
@@ -186,6 +216,8 @@ class ApiService {
       return "success";
     } else {
       final data = jsonDecode(response.body);
+      developer.log(
+          'Failed to create user: ${response.statusCode}, ${response.body}');
       return data['detail'] ?? "Error Creating User: ${response.statusCode}";
     }
   }
@@ -266,6 +298,71 @@ class ApiService {
       final data = jsonDecode(response.body);
       return data['detail'] ??
           "Error Updating User Phone: ${response.statusCode}";
+    }
+  }
+  // In api_service.dart
+
+  Future<http.Response> postWithFile(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    List<int>? file,
+    String? fileName,
+    required String token,
+  }) async {
+    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl$endpoint'));
+    request.headers['Authorization'] = 'Bearer $token';
+    request.fields
+        .addAll(body.map((key, value) => MapEntry(key, value.toString())));
+
+    if (file != null && fileName != null) {
+      request.files.add(http.MultipartFile.fromBytes(
+        'attachment',
+        file,
+        filename: fileName,
+      ));
+    }
+
+    var response = await request.send();
+    return await http.Response.fromStream(response);
+  }
+
+  Future<http.Response> putWithFile(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    List<int>? file,
+    String? fileName,
+    required String token,
+  }) async {
+    var request = http.MultipartRequest('PUT', Uri.parse('$baseUrl$endpoint'));
+    request.headers['Authorization'] = 'Bearer $token';
+    request.fields
+        .addAll(body.map((key, value) => MapEntry(key, value.toString())));
+
+    if (file != null && fileName != null) {
+      request.files.add(http.MultipartFile.fromBytes(
+        'attachment',
+        file,
+        filename: fileName,
+      ));
+    }
+
+    var response = await request.send();
+    return await http.Response.fromStream(response);
+  }
+
+  Future<void> registerUserDevice(Map<String, dynamic> deviceData) async {
+    try {
+      final response = await post(
+        '/users/register-device',
+        body: deviceData,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to register device: ${response.statusCode}');
+      }
+    } catch (e) {
+      developer.log('Error registering device: $e', name: 'api_service');
+      rethrow;
     }
   }
 }

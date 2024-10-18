@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:vayu_flutter_app/core/di/service_locator.dart';
+import 'package:vayu_flutter_app/features/user/screens/profile_screen.dart';
 import 'package:vayu_flutter_app/shared/mixins/refreshable_dashboard.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
-import 'package:vayu_flutter_app/shared/widgets/app_bar.dart';
-import 'package:vayu_flutter_app/shared/widgets/bottom_navigation.dart';
+import 'package:vayu_flutter_app/features/dashboard/widgets/bottom_navigation.dart';
 import 'package:vayu_flutter_app/features/dashboard/widgets/trip_overview.dart';
 import 'package:vayu_flutter_app/features/dashboard/widgets/quick_actions.dart';
 import 'package:vayu_flutter_app/features/dashboard/widgets/recent_activity.dart';
@@ -30,6 +30,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     // Add more refresh logic for other widgets if needed
   }
 
+  void _refreshAllTripsScreen() {
+    _allTripsScreenKey.currentState?.refreshTrips();
+  }
+
   @override
   void refreshDashboard() {
     _refreshIndicatorKey.currentState?.show();
@@ -38,7 +42,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const VayuAppBar(),
       body: RefreshIndicator(
         key: _refreshIndicatorKey,
         onRefresh: _refreshDashboard,
@@ -56,7 +59,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
             const Placeholder(), // Expenses screen
             const Placeholder(), // Chat screen
-            const Placeholder(), // Profile screen
+            const ProfileScreen(), // Profile screen
           ],
         ),
       ),
@@ -66,6 +69,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           setState(() {
             _currentIndex = index;
           });
+          if (index == 1) {
+            // Assuming index 1 is for the AllTripsScreen
+            _refreshAllTripsScreen();
+          }
         },
       ),
     );
@@ -90,83 +97,105 @@ class DashboardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return CustomScrollView(
       controller: scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildWelcomeSection(context),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      slivers: [
+        _buildAppBar(context),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
             child: TripOverview(key: tripOverviewKey),
           ),
-          const SizedBox(height: 24),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
             child: QuickActions(
               onDashboardRefreshNeeded: () {
                 tripOverviewKey.currentState?.refreshTrips();
               },
             ),
           ),
-          const SizedBox(height: 24),
-          const Padding(
+        ),
+        const SliverToBoxAdapter(
+          child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.0),
             child: RecentActivity(),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildWelcomeSection(BuildContext context) {
+  Widget _buildAppBar(BuildContext context) {
     var authNotifier = getIt<AuthNotifier>();
     final user = authNotifier.currentUser;
     final userName = (user?.displayName?.isNotEmpty == true)
         ? user!.displayName
         : 'Traveler';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.secondary,
-          ],
+
+    return SliverAppBar(
+      expandedHeight: 200.0,
+      floating: false,
+      pinned: true,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Theme.of(context).colorScheme.primary,
+                Theme.of(context).colorScheme.secondary,
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 40),
+                  Text(
+                    'Welcome back,',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    userName!,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Ready for your next adventure?',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Colors.white.withOpacity(0.8),
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Welcome back,',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            userName!,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Ready for your next adventure?',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white,
-                ),
-          ),
-        ],
-      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.notifications, color: Colors.white),
+          onPressed: () {
+            // TODO: Implement notifications
+          },
+        ),
+      ],
     );
   }
 }

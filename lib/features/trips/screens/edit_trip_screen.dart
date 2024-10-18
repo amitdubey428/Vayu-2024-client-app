@@ -102,6 +102,37 @@ class _EditTripScreenState extends State<EditTripScreen> {
         endDate: _endDate,
       );
 
+      // Check if the trip duration has been shortened
+      int oldDuration =
+          widget.trip.endDate.difference(widget.trip.startDate).inDays + 1;
+      int newDuration =
+          updatedTrip.endDate.difference(updatedTrip.startDate).inDays + 1;
+      if (newDuration < oldDuration) {
+        bool shouldProceed = await showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: const Text('Shorten Trip'),
+                  content: const Text(
+                      'Shortening the trip may result in the deletion of some day plans and activities. Do you want to proceed?'),
+                  actions: <Widget>[
+                    TextButton(
+                      child: const Text('Cancel'),
+                      onPressed: () => Navigator.of(context).pop(false),
+                    ),
+                    TextButton(
+                      child: const Text('Proceed'),
+                      onPressed: () => Navigator.of(context).pop(true),
+                    ),
+                  ],
+                );
+              },
+            ) ??
+            false;
+
+        if (!shouldProceed) return;
+      }
+
       try {
         final TripService tripService = getIt<TripService>();
         await tripService.updateTrip(updatedTrip);

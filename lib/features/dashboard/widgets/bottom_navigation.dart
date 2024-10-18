@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vayu_flutter_app/core/routes/route_names.dart';
 
 class VayuBottomNavigation extends StatelessWidget {
   final int currentIndex;
@@ -19,7 +20,14 @@ class VayuBottomNavigation extends StatelessWidget {
       unselectedItemColor:
           Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
       currentIndex: currentIndex,
-      onTap: onTap,
+      onTap: (index) {
+        if (index == 4) {
+          // Profile tab
+          Navigator.pushNamed(context, Routes.profile);
+        } else {
+          onTap(index);
+        }
+      },
       items: const [
         BottomNavigationBarItem(
           icon: Icon(Icons.home_outlined),

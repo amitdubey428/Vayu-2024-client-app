@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'package:vayu_flutter_app/data/models/day_plan_model.dart';
 import 'package:vayu_flutter_app/data/models/trip_model.dart';
 import 'package:vayu_flutter_app/data/models/user_public_info.dart';
 import 'package:vayu_flutter_app/services/api_service.dart';
@@ -144,14 +145,20 @@ class TripRepository {
     }
   }
 
-  Future<String> generateInviteLink(int tripId) async {
+  Future<Map<String, dynamic>> generateInviteLink(int tripId) async {
     try {
       final response = await _apiService.post('/trips/$tripId/invite');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         final String invitationCode = data['invitation_code'];
-        return 'vayuapp://join-trip/$invitationCode';
+        final String expiresAt = data['expires_at'];
+
+        return {
+          'invitation_link': 'vayuapp://join-trip/$invitationCode',
+          'invitation_code': invitationCode,
+          'expires_at': expiresAt,
+        };
       } else {
         throw ApiException('Failed to generate invite link: ${response.body}');
       }
@@ -177,6 +184,97 @@ class TripRepository {
       }
     } catch (e) {
       throw ApiException('An error occurred while joining the trip: $e');
+    }
+  }
+
+  Future<List<DayPlanModel>> getTripDayPlans(int tripId) async {
+    try {
+      final response = await _apiService.get('/trips/$tripId/day-plans');
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList = json.decode(response.body);
+        return jsonList.map((json) => DayPlanModel.fromJson(json)).toList();
+      } else {
+        throw ApiException('Failed to get day plans: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw ApiException('An error occurred while fetching day plans: $e');
+    }
+  }
+
+  Future<DayPlanModel> updateOrCreateDayPlan(
+      int tripId, DayPlanModel dayPlan) async {
+    try {
+      final response = await _apiService.put(
+        '/trips/$tripId/day-plans/${dayPlan.dayPlanId ?? 'new'}',
+        body: json.encode(dayPlan.toJson()),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonMap = json.decode(response.body);
+        return DayPlanModel.fromJson(jsonMap);
+      } else {
+        throw ApiException(
+            'Failed to update/create day plan: ${response.body}');
+      }
+    } catch (e) {
+      throw ApiException(
+          'An error occurred while updating/creating day plan: $e');
+    }
+  }
+
+  Future<void> deleteDayPlan(int tripId, int dayPlanId) async {
+    try {
+      final response =
+          await _apiService.delete('/trips/$tripId/day-plans/$dayPlanId');
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw ApiException('Failed to delete day plan: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw ApiException('An error occurred while deleting day plan: $e');
+    }
+  }
+
+  Future<bool> isSoleAdmin(int tripId) async {
+    try {
+      final response = await _apiService.get('/trips/$tripId/is-sole-admin');
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        return data['is_sole_admin'] as bool;
+      } else {
+        throw ApiException(
+            'Failed to check sole admin status: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw ApiException(
+          'An error occurred while checking sole admin status: $e');
+    }
+  }
+
+  Future<void> makeUserAdmin(int tripId, int userId) async {
+    try {
+      final response = await _apiService.patch(
+        '/trips/$tripId/make-admin/$userId',
+        headers: {'Content-Type': 'application/json'},
+      );
+      if (response.statusCode != 200) {
+        throw ApiException('Failed to make user admin: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw ApiException('An error occurred while making user admin: $e');
+    }
+  }
+
+  Future<void> removeParticipant(int tripId, int userId) async {
+    try {
+      final response =
+          await _apiService.delete('/trips/$tripId/remove-participant/$userId');
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw ApiException(
+            'Failed to remove participant: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw ApiException('An error occurred while removing participant: $e');
     }
   }
 }

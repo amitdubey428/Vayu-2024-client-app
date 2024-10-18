@@ -1,67 +1,58 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
+
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:intl_phone_number_input/intl_phone_number_input.dart';
+
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:uni_links/uni_links.dart';
 import 'package:vayu_flutter_app/core/di/service_locator.dart';
 import 'package:vayu_flutter_app/core/routes/route_generator.dart';
-import 'package:vayu_flutter_app/features/auth/screens/email_verification_screen.dart';
-import 'package:vayu_flutter_app/features/auth/screens/otp_verification_screen.dart';
-import 'package:vayu_flutter_app/features/auth/screens/sign_in_sign_up_page.dart';
+
+import 'package:vayu_flutter_app/features/auth/screens/phone_auth_screen.dart';
 import 'package:vayu_flutter_app/features/dashboard/screens/dashboard_screen.dart';
 import 'package:vayu_flutter_app/features/trips/screens/join_trip_screen.dart';
-import 'package:vayu_flutter_app/services/api_service.dart';
 import 'package:vayu_flutter_app/services/auth_notifier.dart';
 import 'package:vayu_flutter_app/core/themes/app_theme.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:vayu_flutter_app/core/utils/globals.dart';
+import 'package:vayu_flutter_app/shared/utils/local_notifications.dart';
 import 'package:vayu_flutter_app/shared/widgets/custom_loading_indicator.dart';
-import 'package:workmanager/workmanager.dart';
 import 'firebase_options.dart';
 import 'dart:developer' as developer;
 
-void callbackDispatcher() {
-  Workmanager().executeTask((task, inputData) async {
-    switch (task) {
-      case "syncUserData":
-        // Initialize required dependencies
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
-        final prefs = await SharedPreferences.getInstance();
-        final apiService = ApiService(
-          dotenv.env['API_BASE_URL'] ?? '',
-          getToken: () => getIt<AuthNotifier>().getRefreshedIdToken(),
-        );
-        final authNotifier = AuthNotifier(
-          FirebaseAuth.instance,
-          prefs,
-          GoogleSignIn(),
-          apiService,
-        );
-        await authNotifier.syncUserData();
-        break;
-    }
-    return Future.value(true);
-  });
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  developer.log("Background message received: ${message.notification?.title}");
+  // Handle background message
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await dotenv.load(fileName: ".env");
+
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
+
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
     await setupServiceLocator();
-    await Workmanager().initialize(callbackDispatcher);
+    await DefaultCacheManager().emptyCache();
+    await setupFlutterNotifications();
+    FirebaseMessaging.onMessage.listen(showFlutterNotification);
+    // Set up foreground message handling
+
     runApp(const MyApp());
   } catch (e) {
-    developer.log('Firebase initialization error: $e');
+    developer.log('Initialization error: $e');
     runApp(ErrorApp(e.toString()));
   }
 }
@@ -78,6 +69,28 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     initUniLinks();
+    _setupPeriodicDeviceCheck();
+    _requestNotificationPermissions();
+  }
+
+  Future<void> _requestNotificationPermissions() async {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    developer.log('User granted permission: ${settings.authorizationStatus}');
+  }
+
+  void _setupPeriodicDeviceCheck() {
+    // Check and update device token every 24 hours
+    Timer.periodic(const Duration(hours: 24), (timer) {
+      final authNotifier = getIt<AuthNotifier>();
+      if (authNotifier.currentUser != null) {
+        authNotifier.registerDevice();
+      }
+    });
   }
 
   Future<void> initUniLinks() async {
@@ -120,44 +133,30 @@ class _MyAppState extends State<MyApp> {
         navigatorKey: navigatorKey,
         title: 'Vayu',
         theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
         home: FutureBuilder(
-            future: getIt<AuthNotifier>().initializeApp(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
-                return Consumer<AuthNotifier>(
-                  builder: (context, authNotifier, _) {
-                    if (authNotifier.pendingRegistration != null) {
-                      return OTPVerificationScreen(
-                        args: OTPScreenArguments(
-                          phoneNumber: PhoneNumber(
-                              phoneNumber: authNotifier
-                                  .pendingRegistration!.mobileNumber),
-                          isNewUser: true,
-                        ),
-                      );
-                    } else if (authNotifier.currentUser != null) {
-                      if (authNotifier.phoneNumberForOtp != null) {
-                        return OTPVerificationScreen(
-                          args: OTPScreenArguments(
-                            phoneNumber: authNotifier.phoneNumberForOtp!,
-                            isNewUser: false,
-                          ),
-                        );
-                      } else if (!authNotifier.currentUser!.emailVerified) {
-                        return const EmailVerificationScreen();
-                      } else {
-                        return const DashboardScreen();
-                      }
+          future: getIt<AuthNotifier>().initializeApp(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.done) {
+              return Consumer<AuthNotifier>(
+                builder: (context, authNotifier, _) {
+                  if (authNotifier.currentUser != null) {
+                    if (authNotifier.userModel != null) {
+                      return const DashboardScreen();
                     } else {
-                      return const SignInSignUpPage();
+                      return const PhoneAuthScreen();
                     }
-                  },
-                );
-              } else {
-                return const CustomLoadingIndicator(
-                    message: 'Loading details...');
-              }
-            }),
+                  } else {
+                    return const PhoneAuthScreen();
+                  }
+                },
+              );
+            } else {
+              return const CustomLoadingIndicator(
+                  message: 'Loading details...');
+            }
+          },
+        ),
         onGenerateRoute: RouteGenerator.generateRoute,
       ),
     );

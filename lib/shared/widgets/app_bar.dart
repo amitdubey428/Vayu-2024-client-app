@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vayu_flutter_app/core/routes/route_names.dart';
 
 class VayuAppBar extends StatelessWidget implements PreferredSizeWidget {
   const VayuAppBar({super.key});
@@ -27,7 +28,7 @@ class VayuAppBar extends StatelessWidget implements PreferredSizeWidget {
           icon: Icon(Icons.person,
               color: Theme.of(context).colorScheme.onPrimary),
           onPressed: () {
-            // TODO: Navigate to profile
+            Navigator.pushNamed(context, Routes.profile);
           },
         ),
       ],

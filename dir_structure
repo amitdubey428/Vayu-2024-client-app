@@ -15,74 +15,101 @@
 ├── dir_structure
 ├── firebase.json
 ├── lib
-│   ├── di
-│   │   └── service_locator.dart
-│   ├── firebase_options.dart
-│   ├── lib
-│   │   └── screens
-│   ├── main.dart
-│   ├── mixins
-│   │   └── refreshable_dashboard.dart
-│   ├── models
-│   │   ├── trip_model.dart
-│   │   ├── user_model.dart
-│   │   └── user_public_info.dart
-│   ├── routes
-│   │   ├── route_generator.dart
-│   │   └── route_names.dart
-│   ├── screens
+│   ├── blocs
+│   │   ├── location_search
+│   │   │   └── location_search_bloc.dart
+│   │   └── trip
+│   ├── core
+│   │   ├── di
+│   │   │   └── service_locator.dart
+│   │   ├── routes
+│   │   │   ├── route_generator.dart
+│   │   │   └── route_names.dart
+│   │   ├── themes
+│   │   │   └── app_theme.dart
+│   │   └── utils
+│   │       ├── country_codes.dart
+│   │       ├── custom_exceptions.dart
+│   │       └── globals.dart
+│   ├── data
+│   │   ├── models
+│   │   │   ├── day_plan_model.dart
+│   │   │   ├── trip_model.dart
+│   │   │   ├── user_model.dart
+│   │   │   └── user_public_info.dart
+│   │   └── repositories
+│   │       └── trip_repository.dart
+│   ├── features
 │   │   ├── auth
-│   │   │   ├── email_verification_screen.dart
-│   │   │   ├── forms
-│   │   │   │   ├── sign_in_form.dart
-│   │   │   │   └── sign_up_form.dart
-│   │   │   ├── otp_verification_screen.dart
-│   │   │   └── sign_in_sign_up_page.dart
-│   │   ├── common
-│   │   │   └── loading_screen.dart
-│   │   ├── home
-│   │   │   └── dashboard_screen.dart
+│   │   │   ├── screens
+│   │   │   │   ├── email_verification_screen.dart
+│   │   │   │   ├── otp_verification_screen.dart
+│   │   │   │   └── sign_in_sign_up_page.dart
+│   │   │   └── widgets
+│   │   │       ├── sign_in_form.dart
+│   │   │       └── sign_up_form.dart
+│   │   ├── dashboard
+│   │   │   ├── screens
+│   │   │   │   └── dashboard_screen.dart
+│   │   │   └── widgets
+│   │   │       ├── bottom_navigation.dart
+│   │   │       ├── quick_actions.dart
+│   │   │       ├── recent_activity.dart
+│   │   │       └── trip_overview.dart
 │   │   ├── onboarding
-│   │   │   ├── temporary_home_page.dart
-│   │   │   └── welcome.dart
+│   │   │   └── screens
+│   │   │       ├── temporary_home_page.dart
+│   │   │       └── welcome.dart
 │   │   ├── trips
-│   │   │   ├── all_trips_screen.dart
-│   │   │   ├── create_trip_screen.dart
-│   │   │   ├── join_trip_screen.dart
-│   │   │   └── trip_detail_screen.dart
+│   │   │   ├── screens
+│   │   │   │   ├── add_edit_activity_screen.dart
+│   │   │   │   ├── add_edit_day_plan_screen.dart
+│   │   │   │   ├── add_edit_stay_screen.dart
+│   │   │   │   ├── all_trips_screen.dart
+│   │   │   │   ├── create_trip_screen.dart
+│   │   │   │   ├── edit_trip_screen.dart
+│   │   │   │   ├── join_trip_screen.dart
+│   │   │   │   ├── location_search_dialog.dart
+│   │   │   │   └── trip_detail_screen.dart
+│   │   │   └── widgets
+│   │   │       ├── animated_expansion_tile.dart
+│   │   │       ├── day_plan_card.dart
+│   │   │       └── trip_card.dart
 │   │   └── user
-│   │       └── user_details_screen.dart
+│   │       └── screens
+│   │           └── user_details_screen.dart
+│   ├── firebase_options.dart
+│   ├── main.dart
 │   ├── services
 │   │   ├── api_service.dart
+│   │   ├── attachment_service.dart
 │   │   ├── auth_notifier.dart
 │   │   └── trip_service.dart
-│   ├── themes
-│   │   └── app_theme.dart
-│   ├── utils
-│   │   ├── country_codes.dart
-│   │   ├── custom_exceptions.dart
-│   │   └── globals.dart
-│   └── widgets
-│       ├── add_participant_dialog.dart
-│       ├── app_bar.dart
-│       ├── bottom_navigation.dart
-│       ├── custom_count_down_timer.dart
-│       ├── custom_form_card.dart
-│       ├── custom_loading_indicator.dart
-│       ├── custom_otp_form_field.dart
-│       ├── custom_text_form_field.dart
-│       ├── date_picker_form_field.dart
-│       ├── qr_code_generator.dart
-│       ├── qr_code_scanner.dart
-│       ├── quick_actions.dart
-│       ├── recent_activity.dart
-│       ├── snackbar_util.dart
-│       ├── trip_card.dart
-│       └── trip_overview.dart
+│   └── shared
+│       ├── mixins
+│       │   └── refreshable_dashboard.dart
+│       ├── utils
+│       │   ├── attachment_utils.dart
+│       │   ├── file_utils.dart
+│       │   ├── location_utils.dart
+│       │   └── time_utils.dart
+│       └── widgets
+│           ├── add_participant_dialog.dart
+│           ├── app_bar.dart
+│           ├── custom_count_down_timer.dart
+│           ├── custom_form_card.dart
+│           ├── custom_loading_indicator.dart
+│           ├── custom_otp_form_field.dart
+│           ├── custom_text_form_field.dart
+│           ├── date_picker_form_field.dart
+│           ├── location_input_field.dart
+│           ├── qr_code_generator.dart
+│           ├── qr_code_scanner.dart
+│           └── snackbar_util.dart
 ├── pubspec.lock
 ├── pubspec.yaml
 ├── test
 │   └── widget_test.dart
 └── update_env.sh
 
-25 directories, 61 files
+37 directories, 76 files

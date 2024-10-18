@@ -28,11 +28,17 @@ class CountryCodePicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // height: 60, // Match the height of CustomTextFormField
+      height: 60, // Match the height of CustomTextFormField
       decoration: BoxDecoration(
-        color: Colors.grey[200],
+        color: Theme.of(context).inputDecorationTheme.fillColor,
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: Colors.grey),
+        border: Border.all(
+            color: Theme.of(context)
+                    .inputDecorationTheme
+                    .border
+                    ?.borderSide
+                    .color ??
+                Colors.grey),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12.0),
       child: Center(

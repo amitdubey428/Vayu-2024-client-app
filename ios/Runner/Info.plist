@@ -56,5 +56,20 @@
 			</array>
 		</dict>
 		</array>
+		<key>io.flutter.embedded_views_preview</key>
+		<true/>
+		<key>MAPS_API_KEY</key>
+		<string>$(MAPS_API_KEY)</string>
+		<key>LSSupportsOpeningDocumentsInPlace</key>
+		<true/>
+		<key>UIFileSharingEnabled</key>
+		<true/>
+		<key>NSAppTransportSecurity</key>
+		<dict>
+			<key>NSAllowsArbitraryLoads</key>
+			<true/>
+		</dict>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>We need access to your photo library to save images.</string>
 	</dict>
 </plist>
